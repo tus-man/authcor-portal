@@ -99,6 +99,20 @@ jobs:
           bench version
           git -C apps/frappe rev-parse --abbrev-ref HEAD
 
+      - name: Start server
+        working-directory: /home/runner/frappe-bench
+        run: |
+          echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
+          bench --site test_site set-config host_name http://test_site:8000
+          nohup bench serve --port 8000 > bench_serve.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://test_site:8000/api/method/ping > /dev/null; then
+              echo "Server up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "Server did not start"; cat bench_serve.log; exit 1
+
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
         run: |
