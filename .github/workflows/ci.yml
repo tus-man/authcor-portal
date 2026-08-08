@@ -92,6 +92,13 @@ jobs:
         env:
           CI: 'Yes'
 
+      - name: Report versions
+        working-directory: /home/runner/frappe-bench
+        run: |
+          python --version
+          bench version
+          git -C apps/frappe rev-parse --abbrev-ref HEAD
+
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
         run: |
