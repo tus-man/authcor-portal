@@ -240,7 +240,8 @@ app_license = "mit"
 # Authentication and authorization
 # --------------------------------
 
-before_login = "authcor.auth.enforce_password_login_roles"
+before_login = "authcor.auth.mark_password_login_attempt"
+on_login = "authcor.auth.enforce_password_login_roles"
 
 # auth_hooks = [
 # 	"authcor.auth.validate"

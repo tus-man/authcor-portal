@@ -1,43 +1,46 @@
 import frappe
 from frappe import _
-from frappe.core.doctype.user.user import User
 
 
-def enforce_password_login_roles(login_manager=None, **kwargs):
-	"""Reject password logins for users outside the AC Auth Settings allowlist.
+def mark_password_login_attempt(login_manager=None, **kwargs):
+	"""before_login fires only for password-login submissions -- magic-link
+	login goes through LoginManager.login_as() directly and never reaches
+	this hook. It also fires before authenticate() verifies the password.
 
-	Runs on the `before_login` hook, which frappe.auth.LoginManager.login()
-	fires only for password-login submissions -- magic-link login goes
-	through LoginManager.login_as() directly and never reaches this hook.
-	See docs/PLAN.md Phase 0.
+	Mark the request so enforce_password_login_roles (on_login, which fires
+	*after* verification but also fires for magic-link logins) can tell
+	this one came through the password path, without re-checking the
+	password itself.
 	"""
-	raw_user = frappe.form_dict.get("usr")
+	frappe.local.flags.in_password_login = True
+
+
+def enforce_password_login_roles(login_manager, **kwargs):
+	"""Reject password logins for users outside the AC Auth Settings
+	allowlist.
+
+	Runs on the on_login hook, which fires only after authenticate() has
+	already verified the password (frappe/auth.py: LoginManager.login() ->
+	authenticate() -> post_login() -> run_trigger("on_login")). A wrong
+	password never reaches here -- authenticate() already raised
+	AuthenticationError with its own "Invalid login credentials" message
+	before post_login() runs, whether or not the account exists or is
+	role-restricted. This hook only ever sees an already-authenticated
+	user, so it can give the specific "not enabled" message without
+	leaking anything a wrong-password attempt wouldn't already leak.
+
+	on_login also fires for magic-link logins (login_as() -> post_login()
+	too), so this only acts when mark_password_login_attempt (before_login)
+	set the marker for this request.
+	"""
+	if not frappe.local.flags.get("in_password_login"):
+		return
+
+	user = login_manager.user
 
 	# Break-glass admin: exempt unconditionally, before any database lookup.
-	# The break-glass account must not depend on a query -- or the settings
-	# record -- succeeding.
-	if raw_user == "Administrator":
+	if user == "Administrator":
 		return
-
-	if not raw_user:
-		return
-
-	# before_login fires before authenticate() resolves `usr` into a User
-	# name -- the raw value may be a username or mobile number instead,
-	# depending on System Settings. Reuse the exact resolution
-	# authenticate() itself uses (User.find_by_credentials), with
-	# validate_password=False so no password check happens here.
-	resolved = User.find_by_credentials(raw_user, "", validate_password=False)
-
-	if not resolved:
-		# Identity didn't resolve to any User. Explicitly fall through to
-		# authenticate(), which will fail on its own with the standard
-		# "Invalid login credentials" error -- mirrors send_login_link's
-		# silent handling of unknown emails, so this hook can't be used to
-		# probe which accounts exist by varying `usr`.
-		return
-
-	user_name = resolved["name"]
 
 	try:
 		settings = frappe.get_cached_doc("AC Auth Settings")
@@ -56,8 +59,11 @@ def enforce_password_login_roles(login_manager=None, **kwargs):
 		# not something a data migration needs to guarantee.
 		return
 
-	if not allowed_roles & set(frappe.get_roles(user_name)):
-		frappe.throw(
-			_("Password login is not enabled for your account. Use the emailed sign-in link instead."),
-			frappe.AuthenticationError,
-		)
+	if not allowed_roles & set(frappe.get_roles(user)):
+		# Mirror LoginManager.fail()'s own pattern: set response["message"]
+		# directly rather than relying only on the msgprint/message_log
+		# path, so this failure is exposed the same way an invalid-
+		# credentials failure already is.
+		message = _("Password login is not enabled for your account. Use the emailed sign-in link instead.")
+		frappe.local.response["message"] = message
+		frappe.throw(message, frappe.AuthenticationError)
