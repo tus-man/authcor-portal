@@ -1,12 +1,12 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import requests
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import get_site_url
-from frappe.www.login import _generate_temporary_login_link
+from frappe.utils.password import update_password
 
 
 def _add_user(email, password, roles=None, username=None):
@@ -21,21 +21,43 @@ def _add_user(email, password, roles=None, username=None):
 	user.save(ignore_permissions=True)
 	for role in roles or []:
 		user.add_roles(role)
-	frappe.db.commit()
 	return user
 
 
-def _password_login(host, usr, pwd):
-	"""POST a real password-login request, exactly like the login form (and
-	like FrappeClient) does. A real HTTP round trip is required here: the
-	before_login/authenticate/on_login sequence depends on request-scoped
-	state (cookies, request_ip) that only a real request sets up, and the
-	request is handled by the running bench process, not this test process."""
-	return requests.post(
-		host,
-		params={"cmd": "login", "usr": usr, "pwd": pwd},
-		headers={"Accept": "application/json", "content-type": "application/x-www-form-urlencoded"},
-	)
+def _seed_request_locals():
+	"""LoginManager normally runs inside a real HTTP request:
+	frappe.auth.HTTPRequest.__init__ sets request_ip and cookie_manager
+	before constructing it, and frappe.local.request is the real werkzeug
+	Request (Session.__init__ reads request.cookies when resuming). There's
+	no live web server reachable during `bench run-tests`, so seed the same
+	thread-local state ourselves instead of driving this over real HTTP."""
+	frappe.local.request_ip = "127.0.0.1"
+	frappe.local.cookie_manager = frappe.auth.CookieManager()
+	frappe.local.response = frappe._dict({"docs": []})
+	frappe.local.request = Request(EnvironBuilder(method="POST", path="/").get_environ())
+
+
+def _attempt_password_login(usr, pwd):
+	"""Drive the real password-login path (before_login -> authenticate ->
+	on_login) in-process."""
+	_seed_request_locals()
+	frappe.local.form_dict = frappe._dict({"cmd": "login", "usr": usr, "pwd": pwd})
+	return frappe.auth.LoginManager()
+
+
+def _attempt_magic_link_login(user):
+	"""Drive LoginManager.login_as() the way login_via_key does, without
+	going through __init__'s password-login dispatch at all -- but still
+	initialize the same slots __init__ would, before login_as() (via
+	post_login -> make_session) reads them."""
+	_seed_request_locals()
+	login_manager = frappe.auth.LoginManager.__new__(frappe.auth.LoginManager)
+	login_manager.user = None
+	login_manager.info = None
+	login_manager.full_name = None
+	login_manager.user_type = None
+	login_manager.login_as(user)
+	return login_manager
 
 
 def _set_allowed_roles(test_case, roles):
@@ -43,7 +65,6 @@ def _set_allowed_roles(test_case, roles):
 	settings.set("password_login_roles", [{"role": role} for role in roles])
 	settings.save(ignore_permissions=True)
 	frappe.clear_cache()
-	frappe.db.commit()
 	test_case.addCleanup(_reset_allowed_roles, test_case)
 
 
@@ -52,20 +73,23 @@ def _reset_allowed_roles(test_case):
 	settings.set("password_login_roles", [])
 	settings.save(ignore_permissions=True)
 	frappe.clear_cache()
-	frappe.db.commit()
 
 
 def _set_system_setting(key, value):
 	frappe.db.set_single_value("System Settings", key, value)
 	frappe.clear_cache()
-	frappe.db.commit()
 
 
 class TestPasswordLoginRoleGate(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		cls.HOST_NAME = frappe.get_site_config().host_name or get_site_url(frappe.local.site)
+		# This site's site_config.json has no admin_password, so
+		# IntegrationTestCase.ADMIN_PASSWORD is None -- set a known
+		# password within the test transaction instead (rolled back with
+		# everything else at class teardown).
+		cls.ADMIN_PASSWORD = "test_admin_pwd_012!"
+		update_password("Administrator", cls.ADMIN_PASSWORD)
 		cls.password = "test_pwd_012!"
 		cls.allowed_user = _add_user("gate_allowed@authcor.test", cls.password, roles=["System Manager"])
 		cls.blocked_user = _add_user("gate_blocked@authcor.test", cls.password, roles=["Sales User"])
@@ -76,24 +100,17 @@ class TestPasswordLoginRoleGate(IntegrationTestCase):
 			username="gate_username_login",
 		)
 
-	@classmethod
-	def tearDownClass(cls):
-		for email in (
-			"gate_allowed@authcor.test",
-			"gate_blocked@authcor.test",
-			"gate_username@authcor.test",
-		):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-		frappe.db.commit()
-		super().tearDownClass()
+	def tearDown(self):
+		frappe.local.form_dict = frappe._dict()
+		frappe.local.flags.pop("in_password_login", None)
+		super().tearDown()
 
 	def test_administrator_password_login_without_settings_record(self):
 		"""Administrator must be able to log in by password even before
 		AC Auth Settings has ever been configured -- break-glass can't
 		depend on a settings record existing."""
-		res = _password_login(self.HOST_NAME, "Administrator", self.ADMIN_PASSWORD)
-		self.assertEqual(res.status_code, 200)
-		self.assertEqual(res.json().get("message"), "Logged In")
+		login_manager = _attempt_password_login("Administrator", self.ADMIN_PASSWORD)
+		self.assertEqual(login_manager.user, "Administrator")
 
 	def test_password_login_allowed_when_allowlist_empty(self):
 		"""An unconfigured/empty allowlist must fail open, not lock every
@@ -101,16 +118,14 @@ class TestPasswordLoginRoleGate(IntegrationTestCase):
 		cleared."""
 		_set_allowed_roles(self, [])
 
-		res = _password_login(self.HOST_NAME, self.blocked_user.name, self.password)
-		self.assertEqual(res.status_code, 200)
-		self.assertEqual(res.json().get("message"), "Logged In")
+		login_manager = _attempt_password_login(self.blocked_user.name, self.password)
+		self.assertEqual(login_manager.user, self.blocked_user.name)
 
 	def test_password_login_allowed_inside_allowlist(self):
 		_set_allowed_roles(self, ["System Manager"])
 
-		res = _password_login(self.HOST_NAME, self.allowed_user.name, self.password)
-		self.assertEqual(res.status_code, 200)
-		self.assertEqual(res.json().get("message"), "Logged In")
+		login_manager = _attempt_password_login(self.allowed_user.name, self.password)
+		self.assertEqual(login_manager.user, self.allowed_user.name)
 
 	def test_password_login_rejected_outside_allowlist(self):
 		"""Correct password, disallowed role: authenticate() must succeed
@@ -118,9 +133,10 @@ class TestPasswordLoginRoleGate(IntegrationTestCase):
 		helpful message."""
 		_set_allowed_roles(self, ["System Manager"])
 
-		res = _password_login(self.HOST_NAME, self.blocked_user.name, self.password)
-		self.assertEqual(res.status_code, 401)
-		self.assertIn("not enabled", res.json().get("message", ""))
+		with self.assertRaises(frappe.AuthenticationError):
+			_attempt_password_login(self.blocked_user.name, self.password)
+
+		self.assertIn("not enabled", frappe.local.response.get("message", ""))
 
 	def test_wrong_password_on_disallowed_account_gives_generic_error(self):
 		"""The bug this design specifically fixes: a wrong password on a
@@ -130,14 +146,16 @@ class TestPasswordLoginRoleGate(IntegrationTestCase):
 		otherwise leak that the account exists and is disallowed."""
 		_set_allowed_roles(self, ["System Manager"])
 
-		res = _password_login(self.HOST_NAME, self.blocked_user.name, "definitely-wrong-password")
-		self.assertEqual(res.status_code, 401)
-		self.assertEqual(res.json().get("message"), "Invalid login credentials")
+		with self.assertRaises(frappe.AuthenticationError):
+			_attempt_password_login(self.blocked_user.name, "definitely-wrong-password")
+
+		self.assertEqual(frappe.local.response.get("message"), "Invalid login credentials")
 
 	def test_wrong_password_on_unknown_user_gives_generic_error(self):
-		res = _password_login(self.HOST_NAME, "no_such_user@authcor.test", "whatever")
-		self.assertEqual(res.status_code, 401)
-		self.assertEqual(res.json().get("message"), "Invalid login credentials")
+		with self.assertRaises(frappe.AuthenticationError):
+			_attempt_password_login("no_such_user@authcor.test", "whatever")
+
+		self.assertEqual(frappe.local.response.get("message"), "Invalid login credentials")
 
 	def test_login_via_username_still_gated_by_role(self):
 		"""authenticate() resolves `usr` (which may be a username, not the
@@ -148,9 +166,8 @@ class TestPasswordLoginRoleGate(IntegrationTestCase):
 
 		_set_allowed_roles(self, ["System Manager"])
 
-		res = _password_login(self.HOST_NAME, "gate_username_login", self.password)
-		self.assertEqual(res.status_code, 200)
-		self.assertEqual(res.json().get("message"), "Logged In")
+		login_manager = _attempt_password_login("gate_username_login", self.password)
+		self.assertEqual(login_manager.user, self.username_user.name)
 
 	def test_magic_link_login_not_gated_by_role(self):
 		"""on_login also fires for magic-link logins (LoginManager.login_as()
@@ -159,22 +176,18 @@ class TestPasswordLoginRoleGate(IntegrationTestCase):
 		restricted account."""
 		_set_allowed_roles(self, ["System Manager"])
 
-		link = _generate_temporary_login_link(self.blocked_user.name, 10)
-		res = requests.get(link)
-		self.assertEqual(res.status_code, 200)
-		self.assertTrue(res.cookies.get("sid"))
-		self.assertNotEqual(res.cookies.get("sid"), "Guest")
+		login_manager = _attempt_magic_link_login(self.blocked_user.name)
+		self.assertEqual(login_manager.user, self.blocked_user.name)
 
 	def test_password_login_allowed_when_settings_record_missing(self):
 		"""Simulate a failed/partial migration where AC Auth Settings
 		itself can't be loaded: the gate must fail open rather than raise
-		or lock everyone out. This is exercised as a direct call, not over
-		HTTP, since there's no way to make the doctype disappear from a
-		real running site without corrupting it."""
+		or lock everyone out. This is exercised as a direct call, not via
+		LoginManager, since there's no way to make the doctype disappear
+		from a real running site without corrupting it."""
 		from authcor.auth import enforce_password_login_roles
 
 		frappe.local.flags.in_password_login = True
-		self.addCleanup(frappe.local.flags.pop, "in_password_login", None)
 
 		with patch("frappe.get_cached_doc", side_effect=frappe.DoesNotExistError):
 			enforce_password_login_roles(SimpleNamespace(user=self.blocked_user.name))
