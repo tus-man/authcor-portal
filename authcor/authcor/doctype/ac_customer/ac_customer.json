@@ -1,0 +1,135 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "field:customer_name",
+ "creation": "2026-08-09 00:55:28.926786",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "details_section",
+  "customer_name",
+  "account_code",
+  "service_level",
+  "is_active",
+  "default_country",
+  "default_city",
+  "service_areas_section",
+  "service_areas",
+  "people_section",
+  "portal_users",
+  "authorised_engineers",
+  "leads_and_heads"
+ ],
+ "fields": [
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "account_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Account Code",
+   "unique": 1
+  },
+  {
+   "fieldname": "service_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Service Level",
+   "options": "Premium\nStandard\nBasic\nP4-Scheduled",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "default_country",
+   "fieldtype": "Link",
+   "label": "Default Country",
+   "options": "Country"
+  },
+  {
+   "fieldname": "default_city",
+   "fieldtype": "Link",
+   "label": "Default City",
+   "options": "AC City"
+  },
+  {
+   "fieldname": "service_areas_section",
+   "fieldtype": "Section Break",
+   "label": "Service Areas"
+  },
+  {
+   "fieldname": "service_areas",
+   "fieldtype": "Table",
+   "label": "Service Areas",
+   "options": "AC Customer Service Area"
+  },
+  {
+   "fieldname": "people_section",
+   "fieldtype": "Section Break",
+   "label": "People"
+  },
+  {
+   "fieldname": "portal_users",
+   "fieldtype": "Table",
+   "label": "Portal Users",
+   "options": "AC Customer User"
+  },
+  {
+   "fieldname": "authorised_engineers",
+   "fieldtype": "Table",
+   "label": "Authorised Engineers",
+   "options": "AC Customer Engineer"
+  },
+  {
+   "fieldname": "leads_and_heads",
+   "fieldtype": "Table",
+   "label": "Leads & Heads",
+   "options": "AC Customer Lead Head"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-09 01:05:40.389268",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC Customer",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
