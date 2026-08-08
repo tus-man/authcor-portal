@@ -104,6 +104,42 @@ class TestCombineLocalTimeToUtc(IntegrationTestCase):
 		result = combine_local_time_to_utc(date(2026, 6, 15), time(3, 0), SGT)
 		self.assertEqual(result.isoformat(), "2026-06-14T19:00:00")
 
+	# US DST begins 2026-03-08 at 02:00 local (clocks spring forward to
+	# 03:00) -- confirmed against zoneinfo directly rather than assumed,
+	# since "second Sunday in March" shifts year to year.
+
+	def test_new_york_before_dst_transition_is_est(self):
+		result = combine_local_time_to_utc(date(2026, 3, 7), time(9, 0), "America/New_York")
+		self.assertEqual(result.isoformat(), "2026-03-07T14:00:00")
+
+	def test_new_york_after_dst_transition_is_edt(self):
+		result = combine_local_time_to_utc(date(2026, 3, 8), time(9, 0), "America/New_York")
+		self.assertEqual(result.isoformat(), "2026-03-08T13:00:00")
+
+	def test_new_york_dst_transition_changes_utc_offset(self):
+		# Same local wall-clock time, one day apart, must convert to a
+		# different UTC hour -- proof the conversion actually consults
+		# the zone's transition table rather than a fixed offset.
+		before = combine_local_time_to_utc(date(2026, 3, 7), time(9, 0), "America/New_York")
+		after = combine_local_time_to_utc(date(2026, 3, 8), time(9, 0), "America/New_York")
+		self.assertNotEqual(before.hour, after.hour)
+
+	# EU DST begins 2026-03-29 at 01:00 UTC (02:00 CET -> 03:00 CEST) --
+	# last Sunday in March. Authcor has data centres in the Netherlands.
+
+	def test_amsterdam_before_dst_transition_is_cet(self):
+		result = combine_local_time_to_utc(date(2026, 3, 28), time(9, 0), "Europe/Amsterdam")
+		self.assertEqual(result.isoformat(), "2026-03-28T08:00:00")
+
+	def test_amsterdam_after_dst_transition_is_cest(self):
+		result = combine_local_time_to_utc(date(2026, 3, 29), time(9, 0), "Europe/Amsterdam")
+		self.assertEqual(result.isoformat(), "2026-03-29T07:00:00")
+
+	def test_amsterdam_dst_transition_changes_utc_offset(self):
+		before = combine_local_time_to_utc(date(2026, 3, 28), time(9, 0), "Europe/Amsterdam")
+		after = combine_local_time_to_utc(date(2026, 3, 29), time(9, 0), "Europe/Amsterdam")
+		self.assertNotEqual(before.hour, after.hour)
+
 
 class TestSmartHandsRequestController(IntegrationTestCase):
 	@classmethod

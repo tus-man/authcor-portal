@@ -24,6 +24,40 @@ def _add_user(email, password, roles=None, username=None):
 	return user
 
 
+def _delete_users(names):
+	for name in names:
+		if frappe.db.exists("User", name):
+			frappe.delete_doc("User", name, force=True, ignore_permissions=True)
+	frappe.db.commit()
+
+
+def _get_password_hash(doctype, name, fieldname="password"):
+	rows = frappe.db.sql(
+		"select `password`, `encrypted` from `__Auth` where `doctype`=%s and `name`=%s and `fieldname`=%s",
+		(doctype, name, fieldname),
+		as_dict=True,
+	)
+	return rows[0] if rows else None
+
+
+def _restore_password_hash(doctype, name, row, fieldname="password"):
+	"""Write the exact raw __Auth row captured before the test class ran.
+	Used to restore Administrator's real password verbatim -- this class
+	never needs to know or choose what that password actually is."""
+	if row is None:
+		frappe.db.sql(
+			"delete from `__Auth` where `doctype`=%s and `name`=%s and `fieldname`=%s",
+			(doctype, name, fieldname),
+		)
+	else:
+		frappe.db.sql(
+			"update `__Auth` set `password`=%s, `encrypted`=%s "
+			"where `doctype`=%s and `name`=%s and `fieldname`=%s",
+			(row.password, row.encrypted, doctype, name, fieldname),
+		)
+	frappe.db.commit()
+
+
 def _seed_request_locals():
 	"""LoginManager normally runs inside a real HTTP request:
 	frappe.auth.HTTPRequest.__init__ sets request_ip and cookie_manager
@@ -73,23 +107,41 @@ def _reset_allowed_roles(test_case):
 	settings.set("password_login_roles", [])
 	settings.save(ignore_permissions=True)
 	frappe.clear_cache()
+	# A successful login earlier in the same test may already have
+	# committed the transaction (see class docstring below); commit this
+	# reset explicitly too so it can't be left dangling either way.
+	frappe.db.commit()
 
 
 def _set_system_setting(key, value):
 	frappe.db.set_single_value("System Settings", key, value)
 	frappe.clear_cache()
+	frappe.db.commit()
 
 
 class TestPasswordLoginRoleGate(IntegrationTestCase):
+	"""A successful login in these tests commits the whole transaction --
+	frappe.sessions.Session creation calls frappe.db.commit() for
+	durability, so nothing this class writes is rolled back automatically
+	the way IntegrationTestCase normally guarantees. Every write this class
+	makes (Administrator's password, the fixture users, the settings doc)
+	is therefore explicitly restored/deleted via addClassCleanup/addCleanup
+	rather than relying on rollback."""
+
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		# This site's site_config.json has no admin_password, so
-		# IntegrationTestCase.ADMIN_PASSWORD is None -- set a known
-		# password within the test transaction instead (rolled back with
-		# everything else at class teardown).
+
+		# Capture Administrator's real password hash before touching it,
+		# so it can be restored verbatim regardless of what it actually
+		# is -- this site's site_config.json has no admin_password, so
+		# IntegrationTestCase.ADMIN_PASSWORD is None and we need a known
+		# password to log in with during the tests.
+		admin_auth_row = _get_password_hash("User", "Administrator")
+		cls.addClassCleanup(_restore_password_hash, "User", "Administrator", admin_auth_row)
 		cls.ADMIN_PASSWORD = "test_admin_pwd_012!"
 		update_password("Administrator", cls.ADMIN_PASSWORD)
+
 		cls.password = "test_pwd_012!"
 		cls.allowed_user = _add_user("gate_allowed@authcor.test", cls.password, roles=["System Manager"])
 		cls.blocked_user = _add_user("gate_blocked@authcor.test", cls.password, roles=["Sales User"])
@@ -98,6 +150,10 @@ class TestPasswordLoginRoleGate(IntegrationTestCase):
 			cls.password,
 			roles=["System Manager"],
 			username="gate_username_login",
+		)
+		cls.addClassCleanup(
+			_delete_users,
+			[cls.allowed_user.name, cls.blocked_user.name, cls.username_user.name],
 		)
 
 	def tearDown(self):
