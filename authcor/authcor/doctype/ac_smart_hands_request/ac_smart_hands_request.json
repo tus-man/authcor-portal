@@ -1,0 +1,333 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:naming_series",
+ "creation": "2026-08-09 02:24:01.986997",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "customer_and_location",
+  "naming_series",
+  "customer",
+  "service_level",
+  "country",
+  "city",
+  "data_center",
+  "site_timezone",
+  "request_detail_section",
+  "subject",
+  "severity",
+  "action_required",
+  "action_other_details",
+  "column_break_gyav",
+  "status",
+  "completed_by",
+  "completed_on",
+  "section_break_uylp",
+  "target_equipment",
+  "description",
+  "attachments",
+  "external_reference",
+  "engineers_section",
+  "engineers_required",
+  "assigned_engineers",
+  "scheduling_section",
+  "preferred_slots",
+  "section_break_yjlc",
+  "confirmed_date",
+  "column_break_pmzl",
+  "confirmed_time",
+  "section_break_opyi",
+  "confirmed_datetime",
+  "column_break_pscc",
+  "confirmed_engineer",
+  "dc_access_section",
+  "dc_access_ticket_number",
+  "column_break_ezeg",
+  "engineer_profile_released",
+  "column_break_qnsn",
+  "profile_released_on",
+  "proof_of_work_section",
+  "proof_of_work"
+ ],
+ "fields": [
+  {
+   "fieldname": "customer_and_location",
+   "fieldtype": "Section Break",
+   "label": "Customer & Location"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "AC-SH-.YYYY.-.#####"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "AC Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "service_level",
+   "fieldtype": "Data",
+   "label": "Service Level",
+   "read_only": 1
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country",
+   "reqd": 1
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Link",
+   "label": "City",
+   "options": "AC City",
+   "reqd": 1
+  },
+  {
+   "fieldname": "data_center",
+   "fieldtype": "Link",
+   "label": "Data Center",
+   "options": "AC Data Center",
+   "reqd": 1
+  },
+  {
+   "fieldname": "site_timezone",
+   "fieldtype": "Data",
+   "label": "Timezone"
+  },
+  {
+   "fieldname": "request_detail_section",
+   "fieldtype": "Section Break",
+   "label": "Request Detail"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "default": "P4",
+   "fieldname": "severity",
+   "fieldtype": "Select",
+   "label": "Severity",
+   "options": "P1\nP2\nP3\nP4",
+   "reqd": 1
+  },
+  {
+   "fieldname": "action_required",
+   "fieldtype": "Select",
+   "label": "Action Required",
+   "options": "Remote Hands\nBreak-fix\nInstallation\nDecommission\nCabling\nOthers",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.action_required==\"Others\"",
+   "fieldname": "action_other_details",
+   "fieldtype": "Data",
+   "label": "Other Details",
+   "mandatory_depends_on": "eval:doc.action_required==\"Others\""
+  },
+  {
+   "fieldname": "column_break_gyav",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "New",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "New\nIn Pool\nPartially Claimed\nClaimed\nScheduled\nIn Progress\nCompleted\nCancelled"
+  },
+  {
+   "depends_on": "eval:doc.status==\"Completed\"",
+   "fieldname": "completed_by",
+   "fieldtype": "Link",
+   "label": "Completed By",
+   "mandatory_depends_on": "eval:doc.status==\"Completed\"",
+   "options": "AC Engineer Profile"
+  },
+  {
+   "depends_on": "eval:doc.status==\"Completed\"",
+   "fieldname": "completed_on",
+   "fieldtype": "Datetime",
+   "label": "Completed On",
+   "mandatory_depends_on": "eval:doc.status==\"Completed\"",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_uylp",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "target_equipment",
+   "fieldtype": "Small Text",
+   "label": "Target Equipment"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description",
+   "reqd": 1
+  },
+  {
+   "fieldname": "attachments",
+   "fieldtype": "Attach",
+   "label": "Attachments"
+  },
+  {
+   "fieldname": "external_reference",
+   "fieldtype": "Data",
+   "label": "Customer Reference"
+  },
+  {
+   "fieldname": "engineers_section",
+   "fieldtype": "Section Break",
+   "label": "Engineers"
+  },
+  {
+   "default": "1",
+   "fieldname": "engineers_required",
+   "fieldtype": "Int",
+   "label": "Engineers Required",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "assigned_engineers",
+   "fieldtype": "Table",
+   "label": "Assigned Engineers",
+   "options": "AC Ticket Engineer"
+  },
+  {
+   "fieldname": "scheduling_section",
+   "fieldtype": "Section Break",
+   "label": "Scheduling"
+  },
+  {
+   "fieldname": "preferred_slots",
+   "fieldtype": "Table",
+   "label": "Preferred Slots",
+   "options": "AC Preferred Slot"
+  },
+  {
+   "fieldname": "section_break_yjlc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "confirmed_date",
+   "fieldtype": "Date",
+   "label": "Confirmed Date"
+  },
+  {
+   "fieldname": "column_break_pmzl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "confirmed_time",
+   "fieldtype": "Select",
+   "label": "Confirmed Time",
+   "options": "00:00\n00:30\n01:00\n01:30\n02:00\n02:30\n03:00\n03:30\n04:00\n04:30\n05:00\n05:30\n06:00\n06:30\n07:00\n07:30\n08:00\n08:30\n09:00\n09:30\n10:00\n10:30\n11:00\n11:30\n12:00\n12:30\n13:00\n13:30\n14:00\n14:30\n15:00\n15:30\n16:00\n16:30\n17:00\n17:30\n18:00\n18:30\n19:00\n19:30\n20:00\n20:30\n21:00\n21:30\n22:00\n22:30\n23:00\n23:30"
+  },
+  {
+   "fieldname": "section_break_opyi",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "confirmed_datetime",
+   "fieldtype": "Datetime",
+   "label": "Confirmed (UTC)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_pscc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "confirmed_engineer",
+   "fieldtype": "Link",
+   "label": "Confirmed Engineer",
+   "options": "User"
+  },
+  {
+   "fieldname": "dc_access_section",
+   "fieldtype": "Section Break",
+   "label": "DC Access"
+  },
+  {
+   "fieldname": "dc_access_ticket_number",
+   "fieldtype": "Data",
+   "label": "DC Access Ticket Number"
+  },
+  {
+   "fieldname": "column_break_ezeg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "engineer_profile_released",
+   "fieldtype": "Check",
+   "label": "Engineer Profile Released",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qnsn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "profile_released_on",
+   "fieldtype": "Datetime",
+   "label": "Released On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "proof_of_work_section",
+   "fieldtype": "Section Break",
+   "label": "Proof of work"
+  },
+  {
+   "fieldname": "proof_of_work",
+   "fieldtype": "Table",
+   "label": "Proof of work",
+   "options": "AC Proof Image"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-09 03:12:12.097103",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC Smart Hands Request",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "subject"
+}
