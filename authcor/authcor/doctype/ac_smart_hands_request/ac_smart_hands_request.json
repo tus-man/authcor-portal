@@ -72,6 +72,7 @@
    "reqd": 1
   },
   {
+   "fetch_from": "customer.service_level",
    "fieldname": "service_level",
    "fieldtype": "Data",
    "label": "Service Level",
@@ -99,6 +100,7 @@
    "reqd": 1
   },
   {
+   "fetch_from": "city.timezone",
    "fieldname": "site_timezone",
    "fieldtype": "Data",
    "label": "Timezone"
@@ -304,7 +306,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-09 03:12:12.097103",
+ "modified": "2026-08-09 04:27:02.075843",
  "modified_by": "Administrator",
  "module": "Authcor",
  "name": "AC Smart Hands Request",
