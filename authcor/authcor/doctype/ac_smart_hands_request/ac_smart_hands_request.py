@@ -8,6 +8,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_days, getdate, now_datetime
+from frappe.utils.password import get_decrypted_password
 
 
 def resolve_owning_slot(confirmed_date, confirmed_time):
@@ -33,6 +34,75 @@ def combine_local_time_to_utc(local_date, local_time, timezone_name):
 	the equivalent naive UTC datetime, for storing in confirmed_datetime."""
 	local_dt = datetime.datetime.combine(local_date, local_time, tzinfo=ZoneInfo(timezone_name))
 	return local_dt.astimezone(datetime.UTC).replace(tzinfo=None)
+
+
+UNRESTRICTED_TICKET_ROLES = {"Admin L1", "Admin L2", "Admin L3", "Operations L1 Authorizer"}
+SCOPED_TICKET_ROLES = {"Operations L2 Authorizer", "Operations L3 Authorizer"}
+
+
+def get_visibility_condition(user):
+	"""The single expression of who may see an AC Smart Hands Request.
+	Written once and used, verbatim, by both get_permission_query_conditions
+	(list views/reports/get_list) and has_permission (get_doc/API reads) --
+	the same SQL text is reused by has_permission below, not just the rule
+	it expresses, so the two mechanisms can't drift apart.
+
+	Returns None when the user should see everything -- Admin L1/L2/L3 and
+	Operations L1 get no restriction from this hook at all; every other
+	role (including client roles) is left to Frappe's own User Permission
+	enforcement, which this hook doesn't need to duplicate.
+
+	Returns a SQL WHERE fragment (referencing `tabAC Smart Hands
+	Request`) for Operations L2/L3: their own customer's
+	`authorised_engineers`, plus any ticket they are already assigned to
+	-- so losing customer authorisation mid-ticket doesn't hide a ticket
+	they're still working.
+	"""
+	roles = set(frappe.get_roles(user))
+
+	if roles & UNRESTRICTED_TICKET_ROLES:
+		return None
+
+	if not (roles & SCOPED_TICKET_ROLES):
+		return None
+
+	user_escaped = frappe.db.escape(user)
+	return f"""(
+		`tabAC Smart Hands Request`.customer in (
+			select ce.parent from `tabAC Customer Engineer` ce where ce.engineer = {user_escaped}
+		)
+		or `tabAC Smart Hands Request`.name in (
+			select te.parent from `tabAC Ticket Engineer` te where te.engineer = {user_escaped}
+		)
+	)"""
+
+
+def get_permission_query_conditions(user, doctype=None):
+	return get_visibility_condition(user) or ""
+
+
+def has_permission(doc, ptype=None, user=None, debug=False):
+	if not user:
+		user = frappe.session.user
+
+	if doc.is_new():
+		# Nothing to scope a not-yet-saved document against -- create
+		# permission is governed by the standard Role Permissions Manager.
+		return True
+
+	condition = get_visibility_condition(user)
+	if condition is None:
+		return True
+
+	# Re-run the exact same SQL fragment used above, narrowed to this one
+	# document, rather than re-expressing the rule in Python -- that's
+	# what guarantees the two hooks can't disagree.
+	return bool(
+		frappe.db.sql(
+			f"select name from `tabAC Smart Hands Request` where name = %s and {condition}",
+			(doc.name,),
+		)
+	)
 
 
 def _ensure_customer_access(customer):
@@ -75,6 +145,271 @@ def get_allowed_data_centers(customer, city):
 		# every data centre in the city, not just the ones listed.
 		return frappe.get_all("AC Data Center", filters={"city": city}, pluck="name")
 	return list({row.data_center for row in rows if row.data_center})
+
+
+ASSIGNMENT_MANAGER_ROLES = {
+	"Admin L1",
+	"Admin L2",
+	"Admin L3",
+	"Operations L1 Authorizer",
+	"Operations L2 Authorizer",
+}
+
+
+def _get_active_engineer_profile(user):
+	profile_name = frappe.db.get_value("AC Engineer Profile", {"user": user}, "name")
+	if not profile_name:
+		frappe.throw(_("No engineer profile found for {0}.").format(user))
+	profile = frappe.get_doc("AC Engineer Profile", profile_name)
+	if not profile.is_active:
+		frappe.throw(_("The engineer profile for {0} is not active.").format(user))
+	return profile
+
+
+def _is_authorised_engineer(customer, user):
+	return bool(frappe.db.exists("AC Customer Engineer", {"parent": customer, "engineer": user}))
+
+
+def _validate_fin_not_expired(engineer_profile, ticket):
+	"""Only FINs expire, not NRICs (PLAN.md section 9) -- so this is a
+	no-op for any other id_type. Compared against the confirmed slot when
+	one exists yet; otherwise against today, so an already-expired FIN is
+	never allowed to claim regardless of scheduling state."""
+	if engineer_profile.id_type != "FIN" or not engineer_profile.id_expiry:
+		return
+
+	deadline = getdate(ticket.confirmed_datetime) if ticket.confirmed_datetime else getdate()
+	if getdate(engineer_profile.id_expiry) < deadline:
+		frappe.throw(
+			_("Your FIN expires on {0} and cannot be dispatched for this ticket.").format(
+				frappe.utils.formatdate(engineer_profile.id_expiry)
+			)
+		)
+
+
+def _ensure_can_manage_assignments():
+	if not set(frappe.get_roles()) & ASSIGNMENT_MANAGER_ROLES:
+		frappe.throw(
+			_("You are not permitted to manage ticket assignments."),
+			frappe.PermissionError,
+		)
+
+
+def _assign_engineer(doc, engineer_user, added_by):
+	"""Core assignment logic shared by claim_ticket and add_engineer.
+	`doc` must already be the locked (for_update), freshly reloaded
+	ticket -- callers acquire the lock, this function never does.
+	Validates duplicates/capacity/authorisation/FIN-expiry, appends the
+	row, recomputes status, and discloses the engineer's profile."""
+	if any(row.engineer == engineer_user for row in doc.assigned_engineers):
+		frappe.throw(_("{0} is already assigned to this ticket.").format(engineer_user))
+
+	if len(doc.assigned_engineers) >= doc.engineers_required:
+		frappe.throw(_("This ticket is already fully staffed."))
+
+	if not _is_authorised_engineer(doc.customer, engineer_user):
+		frappe.throw(_("{0} is not authorised for this customer.").format(engineer_user))
+
+	engineer_profile = _get_active_engineer_profile(engineer_user)
+	_validate_fin_not_expired(engineer_profile, doc)
+
+	assignment_type = "Primary" if not doc.assigned_engineers else "Support"
+	doc.append(
+		"assigned_engineers",
+		{
+			"engineer": engineer_user,
+			"assignment_type": assignment_type,
+			"claimed_at": now_datetime(),
+			"added_by": added_by,
+		},
+	)
+	doc.status = "Claimed" if len(doc.assigned_engineers) >= doc.engineers_required else "Partially Claimed"
+	doc.save(ignore_permissions=True)
+
+	disclose_engineer_profile(doc, engineer_profile)
+	return doc
+
+
+LOCK_RETRY_ATTEMPTS = 5
+
+
+def _run_with_lock_retry(fn):
+	"""SELECT ... FOR UPDATE under REPEATABLE READ (MariaDB's default,
+	and this site's) can raise QueryDeadlockError -- MariaDB error 1020,
+	ER_CHECKREAD, "Record has changed since last read... try restarting
+	transaction" -- when several transactions race for the same row's
+	lock, even though the lock itself is behaving correctly. This isn't
+	a corner case; it reproduces routinely with as few as two concurrent
+	claimants (verified empirically while building this). Frappe
+	deliberately classifies 1020 the same as a genuine deadlock (1213) --
+	see frappe/database/mariadb/database.py: "Snapshot isolation is also
+	treated as deadlock from User POV" -- and the documented remedy for
+	both is to roll back and retry the whole transaction. `fn` must
+	re-acquire the lock itself on every attempt, not just retry a single
+	statement, since the failure invalidates the whole transaction."""
+	last_error = None
+	for _attempt in range(LOCK_RETRY_ATTEMPTS):
+		try:
+			return fn()
+		except (frappe.QueryDeadlockError, frappe.QueryTimeoutError) as e:
+			last_error = e
+			frappe.db.rollback()
+	raise last_error
+
+
+@frappe.whitelist()
+def claim_ticket(ticket):
+	"""Section 3. Self-claim by the calling engineer."""
+	engineer_user = frappe.session.user
+	# Step 1: fail fast, before ever taking the row lock, on a caller who
+	# isn't a valid engineer at all.
+	_get_active_engineer_profile(engineer_user)
+
+	def _attempt():
+		# Steps 2-3: SELECT ... FOR UPDATE, and this is the first read of
+		# assigned_engineers -- never read before the lock.
+		doc = frappe.get_doc("AC Smart Hands Request", ticket, for_update=True)
+		doc = _assign_engineer(doc, engineer_user, added_by=engineer_user)
+		frappe.db.commit()
+		return doc
+
+	return _run_with_lock_retry(_attempt)
+
+
+@frappe.whitelist()
+def add_engineer(ticket, engineer):
+	"""Section 4. Admin/Ops L1/L2 assignment, bypassing the claim queue --
+	but not the authorisation/capacity/FIN checks, which still apply."""
+	_ensure_can_manage_assignments()
+
+	def _attempt():
+		doc = frappe.get_doc("AC Smart Hands Request", ticket, for_update=True)
+		doc = _assign_engineer(doc, engineer, added_by=frappe.session.user)
+		frappe.db.commit()
+		return doc
+
+	return _run_with_lock_retry(_attempt)
+
+
+@frappe.whitelist()
+def remove_engineer(ticket, engineer):
+	"""Section 4. If the removed engineer was Primary and Support
+	engineers remain, promote the earliest-claimed Support -- otherwise a
+	ticket can end up with only Support engineers and no owner. Status is
+	only recomputed while the ticket is still in the pool lifecycle
+	(In Pool/Partially Claimed/Claimed); a Scheduled-or-later ticket's
+	status is left untouched, since removal rules past that point aren't
+	specified here. The disclosure log is never touched -- the disclosure
+	already happened and the record of it stands."""
+	_ensure_can_manage_assignments()
+
+	def _attempt():
+		doc = frappe.get_doc("AC Smart Hands Request", ticket, for_update=True)
+
+		remaining = [row for row in doc.assigned_engineers if row.engineer != engineer]
+		if len(remaining) == len(doc.assigned_engineers):
+			frappe.throw(_("{0} is not assigned to this ticket.").format(engineer))
+
+		was_primary = any(
+			row.engineer == engineer and row.assignment_type == "Primary" for row in doc.assigned_engineers
+		)
+		doc.set("assigned_engineers", remaining)
+
+		if was_primary:
+			remaining_support = sorted(
+				(row for row in doc.assigned_engineers if row.assignment_type == "Support"),
+				key=lambda row: row.claimed_at,
+			)
+			if remaining_support:
+				remaining_support[0].assignment_type = "Primary"
+
+		if doc.status in ("In Pool", "Partially Claimed", "Claimed"):
+			if not doc.assigned_engineers:
+				doc.status = "In Pool"
+			elif len(doc.assigned_engineers) >= doc.engineers_required:
+				doc.status = "Claimed"
+			else:
+				doc.status = "Partially Claimed"
+
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		return doc
+
+	return _run_with_lock_retry(_attempt)
+
+
+def _get_disclosure_recipients(customer):
+	"""Portal users plus leads/heads, per the notification rules in
+	PLAN.md section 6. Only active portal users -- a deactivated portal
+	contact shouldn't keep receiving PDPA-sensitive disclosures."""
+	emails = set()
+
+	for row in customer.portal_users:
+		if row.is_active and row.user:
+			email = frappe.db.get_value("User", row.user, "email")
+			if email:
+				emails.add(email)
+
+	for row in customer.leads_and_heads:
+		if row.user:
+			email = frappe.db.get_value("User", row.user, "email")
+			if email:
+				emails.add(email)
+
+	return emails
+
+
+def disclose_engineer_profile(ticket, engineer_profile):
+	"""Section 3. The single place NRIC/FIN gets disclosed to a customer --
+	called from nowhere else. Reads the decrypted ID, builds the
+	notification, sends it, and writes one AC ID Disclosure Log row per
+	recipient (the log's disclosed_to field holds a single address, so a
+	multi-recipient disclosure is multiple rows sharing the same
+	ticket/engineer/customer). The v2 switch to a portal view only ever
+	needs to change what happens in this function."""
+	customer = frappe.get_doc("AC Customer", ticket.customer)
+	recipients = _get_disclosure_recipients(customer)
+	if not recipients:
+		return
+
+	id_number = get_decrypted_password("AC Engineer Profile", engineer_profile.name, "id_number")
+	engineer_name = frappe.db.get_value("User", engineer_profile.user, "full_name") or engineer_profile.user
+
+	subject = _("Engineer assigned to your ticket {0}").format(ticket.name)
+	message = frappe.render_template(
+		"""
+		<p>An engineer has been assigned to ticket <strong>{{ ticket_name }}</strong> ({{ subject }}).</p>
+		<table>
+			<tr><td>Name</td><td>{{ engineer_name }}</td></tr>
+			<tr><td>{{ id_label }}</td><td>{{ id_number }}</td></tr>
+			<tr><td>Phone</td><td>{{ phone }}</td></tr>
+		</table>
+		<p>Please use these details to file the data centre access request.</p>
+		""",
+		{
+			"ticket_name": ticket.name,
+			"subject": ticket.subject,
+			"engineer_name": engineer_name,
+			"id_label": engineer_profile.id_type,
+			"id_number": id_number,
+			"phone": engineer_profile.phone,
+		},
+	)
+
+	disclosed_on = now_datetime()
+	for email in recipients:
+		frappe.sendmail(recipients=[email], subject=subject, message=message)
+		frappe.get_doc(
+			{
+				"doctype": "AC ID Disclosure Log",
+				"ticket": ticket.name,
+				"engineer": engineer_profile.name,
+				"customer": customer.name,
+				"disclosed_to": email,
+				"disclosed_on": disclosed_on,
+				"channel": "Email",
+			}
+		).insert(ignore_permissions=True)
 
 
 class ACSmartHandsRequest(Document):

@@ -126,13 +126,13 @@ app_license = "mit"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+permission_query_conditions = {
+	"AC Smart Hands Request": "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.get_permission_query_conditions",
+}
+
+has_permission = {
+	"AC Smart Hands Request": "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.has_permission",
+}
 
 # Document Events
 # ---------------
