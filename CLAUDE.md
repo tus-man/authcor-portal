@@ -69,6 +69,9 @@ Hard-won; don't rediscover these.
 - frappe.get_all bypasses permissions entirely; frappe.get_list enforces them. Any whitelisted method using get_all needs its own explicit has_permission check. This one matters immediately — the Phase 2b pool query is exactly that shape.
 - fetch_from on a field pulls values automatically via linkfield.targetfield, no code needed
 - eval: in Depends On boxes trips the JS linter; the warning is cosmetic
+- Only Administrator and System Manager read Page by default in v16 — every Desk-facing role needs an explicit read grant or users hit "No permission for Page" at login
+- DocType JSON: Desk is the source of truth in development. Editing the file directly needs a bench migrate to take effect, and a later Desk edit will overwrite it from the database.
+- Whitelisted methods need a client-script button to be reachable from the UI — building the method isn't enough
 
 ## Navigating Desk
 

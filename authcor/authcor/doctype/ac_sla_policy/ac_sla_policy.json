@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "autoname": "format:{service_level}-{severity}",
+ "creation": "2026-08-16 21:00:47.595556",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "service_level",
+  "severity",
+  "response_minutes",
+  "onsite_minutes",
+  "onsite_next_business_day",
+  "business_hours_only",
+  "is_active"
+ ],
+ "fields": [
+  {
+   "fieldname": "service_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Service Level",
+   "options": "Premium\nStandard\nBasic\nP4 - Scheduled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "severity",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Severity",
+   "options": "P1\nP2\nP3\nP4",
+   "reqd": 1
+  },
+  {
+   "fieldname": "response_minutes",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Response Target (min)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "onsite_minutes",
+   "fieldtype": "Int",
+   "label": "Onsite Target (min)",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "onsite_next_business_day",
+   "fieldtype": "Check",
+   "label": "Onsite = Next Business Day"
+  },
+  {
+   "default": "0",
+   "fieldname": "business_hours_only",
+   "fieldtype": "Check",
+   "label": "Business Hours Only"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-16 21:30:47.731084",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC SLA Policy",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

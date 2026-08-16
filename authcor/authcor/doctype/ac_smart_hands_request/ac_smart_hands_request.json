@@ -50,7 +50,22 @@
   "column_break_qnsn",
   "profile_released_on",
   "proof_of_work_section",
-  "proof_of_work"
+  "proof_of_work",
+  "performance_section",
+  "sla_policy",
+  "response_due",
+  "onsite_due",
+  "first_response_at",
+  "first_response_minutes",
+  "column_break_yyra",
+  "confirmed_at",
+  "confirmation_minutes",
+  "idle_minutes",
+  "actual_onsite_at",
+  "has_met_response_sla",
+  "has_met_onsite_sla",
+  "section_break_unxo",
+  "severity_history"
  ],
  "fields": [
   {
@@ -306,12 +321,103 @@
   {
    "fieldname": "column_break_tkxd",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "performance_section",
+   "fieldtype": "Section Break",
+   "label": "Performance"
+  },
+  {
+   "fieldname": "sla_policy",
+   "fieldtype": "Link",
+   "label": "SLA Policy",
+   "options": "AC SLA Policy"
+  },
+  {
+   "fieldname": "response_due",
+   "fieldtype": "Datetime",
+   "label": "Response Due",
+   "read_only": 1
+  },
+  {
+   "fieldname": "onsite_due",
+   "fieldtype": "Datetime",
+   "label": "Onsite Due",
+   "read_only": 1
+  },
+  {
+   "fieldname": "first_response_at",
+   "fieldtype": "Datetime",
+   "label": "First Response At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "first_response_minutes",
+   "fieldtype": "Int",
+   "label": "First Response (min)",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_yyra",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "confirmed_at",
+   "fieldtype": "Datetime",
+   "label": "Confirmed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmation_minutes",
+   "fieldtype": "Int",
+   "label": "Confirmation (min)",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "idle_minutes",
+   "fieldtype": "Int",
+   "label": "Idle Time (min)",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_onsite_at",
+   "fieldtype": "Datetime",
+   "label": "Actual Onsite At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "has_met_response_sla",
+   "fieldtype": "Select",
+   "label": "Met Response SLA",
+   "options": "Pending\nYes\nNo",
+   "read_only": 1
+  },
+  {
+   "fieldname": "has_met_onsite_sla",
+   "fieldtype": "Select",
+   "label": "Met Onsite SLA",
+   "options": "Pending\nYes\nNo\nN/A",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_unxo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "severity_history",
+   "fieldtype": "Table",
+   "label": "Severity History",
+   "options": "AC Severity History",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-09 16:18:58.016690",
+ "modified": "2026-08-16 21:53:35.906277",
  "modified_by": "Administrator",
  "module": "Authcor",
  "name": "AC Smart Hands Request",

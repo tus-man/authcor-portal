@@ -178,6 +178,8 @@ Do this only after all DocTypes exist.
 
 **Customer isolation** — User Permissions, at `/app/user-permission`. For each client portal user, create a User Permission linking them to their AC Customer record. Frappe then filters every DocType with a Customer link field automatically.
 
+Page permission for users at base level read.
+
 ### Test isolation adversarially
 
 Role permissions and User Permissions are separate mechanisms, and it is entirely possible for a list view to look correctly filtered while direct record access still works.

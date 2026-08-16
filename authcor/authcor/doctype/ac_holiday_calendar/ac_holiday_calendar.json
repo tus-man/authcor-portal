@@ -2,68 +2,53 @@
  "actions": [],
  "allow_bulk_edit": 1,
  "allow_rename": 1,
- "autoname": "field:city_name",
- "creation": "2026-08-09 00:40:53.386387",
+ "autoname": "field:calendar_name",
+ "creation": "2026-08-16 20:54:42.018836",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "city_name",
+  "calendar_name",
   "country",
-  "timezone",
-  "is_active",
-  "business_hours",
-  "holiday_calendar"
+  "year",
+  "holidays"
  ],
  "fields": [
   {
-   "fieldname": "city_name",
+   "fieldname": "calendar_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "City Name",
+   "label": "Calendar Name",
    "reqd": 1,
    "unique": 1
   },
   {
    "fieldname": "country",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "label": "Country",
-   "options": "Country",
-   "reqd": 1
+   "options": "Country"
   },
   {
-   "fieldname": "timezone",
-   "fieldtype": "Data",
+   "fieldname": "year",
+   "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Timezone",
+   "label": "Year",
+   "non_negative": 1,
    "reqd": 1
   },
   {
-   "default": "1",
-   "fieldname": "is_active",
-   "fieldtype": "Check",
-   "label": "Active"
-  },
-  {
-   "fieldname": "business_hours",
+   "fieldname": "holidays",
    "fieldtype": "Table",
-   "label": "Business Hours",
-   "options": "AC Business Hours"
-  },
-  {
-   "fieldname": "holiday_calendar",
-   "fieldtype": "Link",
-   "label": "Holiday Calendar",
-   "options": "AC Holiday Calendar"
+   "label": "Holidays",
+   "options": "AC Holiday"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 21:00:28.802555",
+ "modified": "2026-08-16 20:56:48.286234",
  "modified_by": "Administrator",
  "module": "Authcor",
- "name": "AC City",
+ "name": "AC Holiday Calendar",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
