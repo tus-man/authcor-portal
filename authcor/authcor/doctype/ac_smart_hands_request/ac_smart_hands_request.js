@@ -8,6 +8,19 @@
 // whitelisted server method and cached on `frm`, and frm.set_query()
 // reads that cache.
 
+// Section 3/4 assignment buttons. Visibility is UI convenience only -- the
+// whitelisted methods re-check everything server-side (engineer profile,
+// authorisation, capacity, roles), so a stale role list here just means a
+// button that would fail with a clear server error, not a security gap.
+const ENGINEER_ROLES = ["Operations L2 Authorizer", "Operations L3 Authorizer"];
+const ASSIGNMENT_MANAGER_ROLES = [
+	"Admin L1",
+	"Admin L2",
+	"Admin L3",
+	"Operations L1 Authorizer",
+	"Operations L2 Authorizer",
+];
+
 frappe.ui.form.on("AC Smart Hands Request", {
 	setup(frm) {
 		frm.set_query("country", () => ({
@@ -27,6 +40,10 @@ frappe.ui.form.on("AC Smart Hands Request", {
 		refresh_allowed_data_centers(frm);
 	},
 
+	refresh(frm) {
+		setup_assignment_buttons(frm);
+	},
+
 	customer(frm) {
 		frm.set_value("country", "");
 		refresh_allowed_countries(frm);
@@ -42,6 +59,89 @@ frappe.ui.form.on("AC Smart Hands Request", {
 		refresh_allowed_data_centers(frm);
 	},
 });
+
+function setup_assignment_buttons(frm) {
+	if (frm.is_new()) return;
+
+	const assigned = frm.doc.assigned_engineers || [];
+	const has_room = assigned.length < frm.doc.engineers_required;
+	const already_assigned = assigned.some((row) => row.engineer === frappe.session.user);
+
+	if (has_room && !already_assigned && frappe.user.has_role(ENGINEER_ROLES)) {
+		frm.add_custom_button(__("Claim Ticket"), () => claim_ticket(frm));
+	}
+
+	if (frappe.user.has_role(ASSIGNMENT_MANAGER_ROLES)) {
+		frm.add_custom_button(__("Add Engineer"), () => add_engineer(frm));
+		if (assigned.length) {
+			frm.add_custom_button(__("Remove Engineer"), () => remove_engineer(frm));
+		}
+	}
+}
+
+function claim_ticket(frm) {
+	frappe.call({
+		method: "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.claim_ticket",
+		args: { ticket: frm.doc.name },
+		freeze: true,
+		callback() {
+			frm.reload_doc();
+		},
+	});
+}
+
+function add_engineer(frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "engineer",
+				fieldtype: "Link",
+				options: "User",
+				label: __("Engineer"),
+				reqd: 1,
+			},
+		],
+		(values) => {
+			frappe.call({
+				method: "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.add_engineer",
+				args: { ticket: frm.doc.name, engineer: values.engineer },
+				freeze: true,
+				callback() {
+					frm.reload_doc();
+				},
+			});
+		},
+		__("Add Engineer"),
+		__("Add")
+	);
+}
+
+function remove_engineer(frm) {
+	const assigned = frm.doc.assigned_engineers || [];
+	frappe.prompt(
+		[
+			{
+				fieldname: "engineer",
+				fieldtype: "Select",
+				options: assigned.map((row) => row.engineer),
+				label: __("Engineer"),
+				reqd: 1,
+			},
+		],
+		(values) => {
+			frappe.call({
+				method: "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.remove_engineer",
+				args: { ticket: frm.doc.name, engineer: values.engineer },
+				freeze: true,
+				callback() {
+					frm.reload_doc();
+				},
+			});
+		},
+		__("Remove Engineer"),
+		__("Remove")
+	);
+}
 
 function refresh_allowed_countries(frm) {
 	frm.allowed_countries = [];

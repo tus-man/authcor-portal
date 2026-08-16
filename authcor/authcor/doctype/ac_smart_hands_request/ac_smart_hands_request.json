@@ -144,12 +144,12 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "New",
+   "default": "In Pool",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "New\nIn Pool\nPartially Claimed\nClaimed\nScheduled\nIn Progress\nCompleted\nCancelled"
+   "options": "In Pool\nPartially Claimed\nClaimed\nScheduled\nIn Progress\nCompleted\nCancelled"
   },
   {
    "depends_on": "eval:doc.status==\"Completed\"",
