@@ -1,14 +1,16 @@
 import threading
+from datetime import timedelta
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import add_days, getdate
+from frappe.utils import add_days, getdate, now_datetime
 
 from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request import (
 	add_engineer,
 	claim_ticket,
 	remove_engineer,
 )
+from authcor.tests.sla_fixtures import ensure_sla_policy_committed
 
 SGT = "Asia/Singapore"
 
@@ -117,6 +119,22 @@ class TestClaimTicket(IntegrationTestCase):
 		super().setUpClass()
 		cls.city = _make_city("Test Claim City")
 		cls.dc = _make_data_center("Test Claim DC", cls.city.name)
+
+		# Every ticket here is a Standard-customer, default-severity (P4)
+		# ticket -- before_insert now requires an active AC SLA Policy for
+		# that pair (PHASE-3-SLA.md section 6). response_minutes chosen
+		# well clear of "now" so claim-time SLA-met assertions don't race
+		# a slow test run.
+		ensure_sla_policy_committed(
+			cls.addClassCleanup,
+			"Standard",
+			"P4",
+			response_minutes=480,
+			onsite_minutes=0,
+			onsite_next_business_day=0,
+			business_hours_only=0,
+			response_next_business_day=0,
+		)
 
 		cls.engineer_a, cls.profile_a = _make_engineer("claim_eng_a@authcor.test")
 		cls.engineer_b, cls.profile_b = _make_engineer("claim_eng_b@authcor.test")
@@ -259,6 +277,63 @@ class TestClaimTicket(IntegrationTestCase):
 		expected_lead_email = frappe.db.get_value("User", self.lead_user.name, "email")
 		self.assertIn(expected_portal_email, recipient_emails)
 		self.assertIn(expected_lead_email, recipient_emails)
+
+	# -- first response / confirmation (PHASE-3-SLA.md sections 1, 6) ---
+
+	def test_first_claim_stamps_first_response_and_meets_sla(self):
+		before = now_datetime()
+		frappe.set_user(self.engineer_a.name)
+		claim_ticket(self.ticket.name)
+		after = now_datetime()
+
+		ticket = self._reload_ticket()
+		self.assertIsNotNone(ticket.first_response_at)
+		self.assertGreaterEqual(ticket.first_response_at, before)
+		self.assertLessEqual(ticket.first_response_at, after)
+		self.assertEqual(
+			ticket.first_response_minutes,
+			int((ticket.first_response_at - ticket.creation).total_seconds() // 60),
+		)
+		self.assertEqual(ticket.has_met_response_sla, "Yes")
+
+	def test_claim_after_response_due_is_a_missed_response(self):
+		self._reload_ticket().db_set("response_due", now_datetime() - timedelta(minutes=1))
+
+		frappe.set_user(self.engineer_a.name)
+		claim_ticket(self.ticket.name)
+
+		self.assertEqual(self._reload_ticket().has_met_response_sla, "No")
+
+	def test_second_claim_does_not_move_first_response_at(self):
+		frappe.set_user(self.engineer_a.name)
+		claim_ticket(self.ticket.name)
+		first_response_at = self._reload_ticket().first_response_at
+
+		frappe.set_user(self.engineer_b.name)
+		claim_ticket(self.ticket.name)
+
+		self.assertEqual(self._reload_ticket().first_response_at, first_response_at)
+
+	def test_confirmation_after_claim_computes_idle_minutes(self):
+		frappe.set_user(self.engineer_a.name)
+		claim_ticket(self.ticket.name)
+		claimed = self._reload_ticket()
+
+		frappe.set_user(self.admin_user.name)
+		claimed.confirmed_date = add_days(getdate(), 1)  # first auto-generated slot date
+		claimed.confirmed_time = "10:00"  # inside band_morning
+		claimed.save(ignore_permissions=True)
+
+		ticket = self._reload_ticket()
+		self.assertIsNotNone(ticket.confirmed_at)
+		self.assertEqual(
+			ticket.confirmation_minutes,
+			int((ticket.confirmed_at - ticket.creation).total_seconds() // 60),
+		)
+		self.assertEqual(
+			ticket.idle_minutes,
+			int((ticket.confirmed_at - ticket.first_response_at).total_seconds() // 60),
+		)
 
 	# -- add_engineer / remove_engineer --------------------------------
 

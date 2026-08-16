@@ -1,6 +1,8 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from authcor.tests.sla_fixtures import ensure_sla_policy
+
 SGT = "Asia/Singapore"
 
 
@@ -63,6 +65,18 @@ class TestTicketVisibilityPredicate(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		# Every ticket here defaults to severity P4 against a Standard
+		# customer -- before_insert now requires an active AC SLA Policy
+		# for that pair to exist (PHASE-3-SLA.md section 6).
+		ensure_sla_policy(
+			"Standard",
+			"P4",
+			response_minutes=480,
+			onsite_minutes=0,
+			onsite_next_business_day=0,
+			business_hours_only=0,
+			response_next_business_day=0,
+		)
 		cls.city = _make_city("Test Visibility City")
 		cls.dc = _make_data_center("Test Visibility DC", cls.city.name)
 

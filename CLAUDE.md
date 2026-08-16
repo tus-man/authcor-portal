@@ -72,6 +72,7 @@ Hard-won; don't rediscover these.
 - Only Administrator and System Manager read Page by default in v16 — every Desk-facing role needs an explicit read grant or users hit "No permission for Page" at login
 - DocType JSON: Desk is the source of truth in development. Editing the file directly needs a bench migrate to take effect, and a later Desk edit will overwrite it from the database.
 - Whitelisted methods need a client-script button to be reachable from the UI — building the method isn't enough
+- Frappe datetime fields hold strings before the database round-trip. frappe.utils.now() returns a string, and self.creation in before_insert is a string, not a datetime. Any function taking a datetime should normalise with get_datetime() at the boundary. Tests using frappe.get_doc() get real datetimes back and won't catch this — write boundary tests that pass ISO strings directly.
 
 ## Navigating Desk
 

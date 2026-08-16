@@ -12,6 +12,7 @@
   "onsite_minutes",
   "onsite_next_business_day",
   "business_hours_only",
+  "response_next_business_day",
   "is_active"
  ],
  "fields": [
@@ -20,7 +21,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Service Level",
-   "options": "Premium\nStandard\nBasic\nP4 - Scheduled",
+   "options": "Premium\nStandard\nBasic\nP4-Scheduled",
    "reqd": 1
   },
   {
@@ -61,12 +62,18 @@
    "fieldname": "is_active",
    "fieldtype": "Check",
    "label": "Active"
+  },
+  {
+   "default": "0",
+   "fieldname": "response_next_business_day",
+   "fieldtype": "Check",
+   "label": "Response = Next Business Day"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 21:30:47.731084",
+ "modified": "2026-08-16 22:17:33.842914",
  "modified_by": "Administrator",
  "module": "Authcor",
  "name": "AC SLA Policy",

@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_days, getdate, now_datetime
+from frappe.utils import add_days, get_datetime, get_time, getdate, now_datetime
 from frappe.utils.password import get_decrypted_password
 
 
@@ -34,6 +34,235 @@ def combine_local_time_to_utc(local_date, local_time, timezone_name):
 	the equivalent naive UTC datetime, for storing in confirmed_datetime."""
 	local_dt = datetime.datetime.combine(local_date, local_time, tzinfo=ZoneInfo(timezone_name))
 	return local_dt.astimezone(datetime.UTC).replace(tzinfo=None)
+
+
+WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+# Bound on how many calendar days _next_working_period_start will scan before
+# giving up. A sane calendar resolves in well under a week; this is just a
+# backstop against an all-non-working-day / all-holiday misconfiguration
+# spinning forever.
+MAX_WORKING_DAY_SEARCH = 370
+
+
+def _business_hours_by_day(city_doc):
+	"""{day_name: (start_time, end_time)} from AC City.business_hours.
+	get_time normalises the field regardless of whether it comes back as a
+	timedelta (Frappe's native Time representation), a datetime.time, or a
+	string -- callers don't need to know which."""
+	return {row.day: (get_time(row.start_time), get_time(row.end_time)) for row in city_doc.business_hours}
+
+
+def _get_holiday_dates(city_doc, year, holiday_cache):
+	"""Holiday dates for `year`, from the AC Holiday Calendar linked on
+	`city_doc` -- cached per call in `holiday_cache` since a single
+	add_business_minutes call can consult the same year repeatedly.
+
+	No calendar linked at all, or a linked calendar for the wrong year, is
+	a configuration error and raises -- same treatment as a city with no
+	business hours, since a missing 2027 calendar would otherwise produce
+	quietly wrong deadlines all year. A calendar that exists for the right
+	year with zero rows in its holidays table is a deliberate "no
+	holidays" answer, not a missing one, and is accepted as-is."""
+	if year in holiday_cache:
+		return holiday_cache[year]
+
+	if not city_doc.holiday_calendar:
+		frappe.throw(
+			_("AC City {0} has no holiday_calendar configured for {1}.").format(city_doc.name, year)
+		)
+
+	calendar = frappe.get_cached_doc("AC Holiday Calendar", city_doc.holiday_calendar)
+	if calendar.year != year:
+		frappe.throw(
+			_("AC Holiday Calendar {0} covers {1}, not {2} -- AC City {3} needs a calendar for {2}.").format(
+				calendar.name, calendar.year, year, city_doc.name
+			)
+		)
+
+	dates = {getdate(row.holiday_date) for row in calendar.holidays}
+	holiday_cache[year] = dates
+	return dates
+
+
+def _is_holiday(city_doc, local_date, holiday_cache):
+	return local_date in _get_holiday_dates(city_doc, local_date.year, holiday_cache)
+
+
+def _next_working_period_start(local_date, business_hours, city_doc, tz, holiday_cache):
+	"""The first working day at or after `local_date` -- a plain date, not a
+	datetime, so this always lands on that day's opening time regardless of
+	what time of day the search started from. Used both to roll over to
+	"tomorrow" after a day's capacity is used up, and to answer
+	next_business_day_end directly."""
+	d = local_date
+	for _ in range(MAX_WORKING_DAY_SEARCH):
+		window = business_hours.get(WEEKDAY_NAMES[d.weekday()])
+		if window and not _is_holiday(city_doc, d, holiday_cache):
+			return datetime.datetime.combine(d, window[0], tzinfo=tz)
+		d += datetime.timedelta(days=1)
+	frappe.throw(
+		_("No working day found for AC City {0} within {1} days of {2} -- check its business hours.").format(
+			city_doc.name, MAX_WORKING_DAY_SEARCH, local_date
+		)
+	)
+
+
+def _advance_to_working_instant(local_dt, business_hours, city_doc, tz, holiday_cache):
+	"""Where the clock actually starts counting from: unchanged if already
+	inside today's working window, moved to today's opening if today is a
+	working day but it's too early, otherwise rolled to the next working
+	day's opening (weekend, holiday, or past closing all take this branch)."""
+	d = local_dt.date()
+	window = business_hours.get(WEEKDAY_NAMES[d.weekday()])
+	if window and not _is_holiday(city_doc, d, holiday_cache):
+		start_time, end_time = window
+		if local_dt.time() < start_time:
+			return datetime.datetime.combine(d, start_time, tzinfo=tz)
+		if local_dt.time() < end_time:
+			return local_dt
+	return _next_working_period_start(d + datetime.timedelta(days=1), business_hours, city_doc, tz, holiday_cache)
+
+
+def _get_business_hours_or_throw(city_doc):
+	business_hours = _business_hours_by_day(city_doc)
+	if not business_hours:
+		frappe.throw(_("AC City {0} has no business hours configured.").format(city_doc.name))
+	return business_hours
+
+
+def add_business_minutes(start_utc, minutes, city):
+	"""Section 5. Advance a naive-UTC timestamp by `minutes` *working*
+	minutes, per `city`'s AC Business Hours and AC Holiday Calendar --
+	skipping non-working hours, non-working days, and holidays. A start
+	outside working hours begins counting from the next working period, not
+	immediately (PHASE-3-SLA.md section 5)."""
+	city_doc = frappe.get_cached_doc("AC City", city)
+	business_hours = _get_business_hours_or_throw(city_doc)
+	tz = ZoneInfo(city_doc.timezone)
+	holiday_cache = {}
+
+	local_start = start_utc.replace(tzinfo=datetime.UTC).astimezone(tz)
+	current = _advance_to_working_instant(local_start, business_hours, city_doc, tz, holiday_cache)
+
+	remaining = minutes
+	while remaining > 0:
+		d = current.date()
+		_start_time, end_time = business_hours[WEEKDAY_NAMES[d.weekday()]]
+		day_end = datetime.datetime.combine(d, end_time, tzinfo=tz)
+		available = (day_end - current).total_seconds() / 60
+
+		if remaining <= available:
+			current += datetime.timedelta(minutes=remaining)
+			remaining = 0
+		else:
+			remaining -= available
+			current = _next_working_period_start(
+				d + datetime.timedelta(days=1), business_hours, city_doc, tz, holiday_cache
+			)
+
+	return current.astimezone(datetime.UTC).replace(tzinfo=None)
+
+
+def next_business_day_end(start_utc, city):
+	"""Section 5. End-of-day of the next working day after `start_utc`'s
+	local date -- always the day *after*, regardless of what time of day
+	start_utc falls at, since this answers "when does the next working day
+	close," not "how much of today is left" (PHASE-3-SLA.md section 5)."""
+	city_doc = frappe.get_cached_doc("AC City", city)
+	business_hours = _get_business_hours_or_throw(city_doc)
+	tz = ZoneInfo(city_doc.timezone)
+	holiday_cache = {}
+
+	local_date = start_utc.replace(tzinfo=datetime.UTC).astimezone(tz).date()
+	next_start = _next_working_period_start(
+		local_date + datetime.timedelta(days=1), business_hours, city_doc, tz, holiday_cache
+	)
+	_start_time, end_time = business_hours[WEEKDAY_NAMES[next_start.weekday()]]
+	day_end = datetime.datetime.combine(next_start.date(), end_time, tzinfo=tz)
+
+	return day_end.astimezone(datetime.UTC).replace(tzinfo=None)
+
+
+def _minutes_between(start, end):
+	"""Same normalise-on-entry reasoning as _compute_due_datetime: `start`
+	is frequently self.creation, which is a string rather than a datetime
+	until the document has been through a DB round-trip. stamp_confirmation
+	can call this from validate() during before_insert's own save (a
+	ticket confirmed at creation, not just via a later edit), which hits
+	the exact same unparsed value."""
+	return int((get_datetime(end) - get_datetime(start)).total_seconds() // 60)
+
+
+def _get_active_sla_policy(service_level, severity):
+	"""Section 6. The unique active AC SLA Policy for (service_level,
+	severity) -- queried by filters rather than the {service_level}-
+	{severity} autoname, since service_level values can contain characters
+	(the P4-Scheduled tier) that make reconstructing the name error-prone."""
+	policy_name = frappe.db.get_value(
+		"AC SLA Policy",
+		{"service_level": service_level, "severity": severity, "is_active": 1},
+		"name",
+	)
+	if not policy_name:
+		frappe.throw(
+			_("No active AC SLA Policy for service level {0}, severity {1}.").format(service_level, severity)
+		)
+	return frappe.get_cached_doc("AC SLA Policy", policy_name)
+
+
+def _compute_due_datetime(start_utc, minutes, next_business_day, business_hours_only, city):
+	"""Section 6. One due-date rule, shared by response and onsite targets:
+	next_business_day wins when ticked (P4-Scheduled, and the Standard/Basic
+	P2 rows); otherwise a plain duration from `start_utc`, in business
+	minutes when business_hours_only is ticked (Basic tier) or wall-clock
+	minutes otherwise. No target at all (neither minutes nor the flag)
+	returns None -- the caller decides what that means.
+
+	Normalises `start_utc` on entry via frappe.utils.get_datetime -- the
+	only boundary this whole SLA pathway has, since a caller mid-insert
+	may still be holding self.creation as the unparsed DB-format string
+	Document.set_user_and_timestamp assigns it (frappe.utils.now()
+	returns a string, not a datetime), not yet cast back by a DB
+	round-trip. get_datetime is a no-op on a value that's already a
+	datetime, so this is free for every other caller."""
+	start_utc = get_datetime(start_utc)
+	if next_business_day:
+		return next_business_day_end(start_utc, city)
+	if not minutes:
+		return None
+	if business_hours_only:
+		return add_business_minutes(start_utc, minutes, city)
+	return start_utc + datetime.timedelta(minutes=minutes)
+
+
+def _apply_sla_policy(doc, policy, start_utc):
+	"""Sections 6-7. Stamp sla_policy/response_due/onsite_due on `doc` from
+	`policy`, computed from `start_utc` -- the single routine shared by
+	ticket creation and severity escalation, since both are just "pick a
+	policy, compute due dates from a given instant" with a different
+	instant. Returns whether the policy carries an onsite target at all,
+	so callers don't re-derive it from the same two fields a second time.
+	Never touches the verdict fields -- those depend on what has already
+	happened on the ticket, which this function has no view of."""
+	doc.sla_policy = policy.name
+	doc.response_due = _compute_due_datetime(
+		start_utc,
+		policy.response_minutes,
+		policy.response_next_business_day,
+		policy.business_hours_only,
+		doc.city,
+	)
+
+	has_onsite_target = bool(policy.onsite_minutes) or bool(policy.onsite_next_business_day)
+	doc.onsite_due = (
+		_compute_due_datetime(
+			start_utc, policy.onsite_minutes, policy.onsite_next_business_day, policy.business_hours_only, doc.city
+		)
+		if has_onsite_target
+		else None
+	)
+	return has_onsite_target
 
 
 UNRESTRICTED_TICKET_ROLES = {"Admin L1", "Admin L2", "Admin L3", "Operations L1 Authorizer"}
@@ -223,6 +452,17 @@ def _assign_engineer(doc, engineer_user, added_by):
 			"added_by": added_by,
 		},
 	)
+
+	if assignment_type == "Primary":
+		# Section 1/6: first response is the first row landing in
+		# assigned_engineers, full stop -- an admin's add_engineer counts
+		# the same as a self-claim, since both produce exactly that event.
+		doc.first_response_at = now_datetime()
+		doc.first_response_minutes = _minutes_between(doc.creation, doc.first_response_at)
+		doc.has_met_response_sla = (
+			"Yes" if not doc.response_due or doc.first_response_at <= doc.response_due else "No"
+		)
+
 	doc.status = "Claimed" if len(doc.assigned_engineers) >= doc.engineers_required else "Partially Claimed"
 	doc.save(ignore_permissions=True)
 
@@ -415,12 +655,19 @@ def disclose_engineer_profile(ticket, engineer_profile):
 class ACSmartHandsRequest(Document):
 	def before_insert(self):
 		self.generate_preferred_slots()
+		self.apply_initial_sla_policy()
 
 	def validate(self):
 		self.validate_engineers_required()
 		self.validate_action_other_details()
 		self.validate_confirmed_slot()
 		self.stamp_completion()
+		# Escalation before onsite-arrival stamping: if severity and status
+		# both change in the same save (rare, but possible), onsite_due
+		# must already reflect the new policy before stamp_onsite_arrival
+		# judges arrival against it.
+		self.handle_severity_escalation()
+		self.stamp_onsite_arrival()
 
 	def generate_preferred_slots(self):
 		"""(a) Seven date rows for the next 7 days, starting the day after
@@ -481,6 +728,22 @@ class ACSmartHandsRequest(Document):
 
 		timezone_name = frappe.db.get_value("AC City", self.city, "timezone")
 		self.confirmed_datetime = combine_local_time_to_utc(confirmed_date, confirmed_time, timezone_name)
+		self.stamp_confirmation()
+
+	def stamp_confirmation(self):
+		"""Section 6. Stamp confirmed_at/confirmation_minutes the first time
+		confirmed_datetime is populated -- same "only when currently empty"
+		guard as stamp_completion, so re-editing an already-confirmed
+		slot doesn't move the confirmation clock. idle_minutes (claim ->
+		confirmation, PHASE-3-SLA.md section 1) is left unset if the ticket
+		was confirmed before any engineer claimed it -- there's no claim
+		instant yet to measure from."""
+		if self.confirmed_at:
+			return
+		self.confirmed_at = now_datetime()
+		self.confirmation_minutes = _minutes_between(self.creation, self.confirmed_at)
+		if self.first_response_at:
+			self.idle_minutes = _minutes_between(self.first_response_at, self.confirmed_at)
 
 	def stamp_completion(self):
 		"""(e) Stamp completed_on/completed_by the first time status becomes
@@ -504,3 +767,81 @@ class ACSmartHandsRequest(Document):
 		else:
 			self.completed_on = None
 			self.completed_by = None
+
+	def apply_initial_sla_policy(self):
+		"""Section 6. sla_policy/response_due/onsite_due are captured once,
+		from self.creation, in before_insert -- never recomputed in
+		validate -- so a later policy revision doesn't retroactively change
+		what a ticket was judged against. has_met_onsite_sla starts N/A
+		rather than Pending when the resolved policy carries no onsite
+		target at all (every P4 severity row, across every service level,
+		per PHASE-3-SLA.md section 4) -- it will never move away from N/A,
+		since there's nothing to judge it against."""
+		policy = _get_active_sla_policy(self.service_level, self.severity)
+		has_onsite_target = _apply_sla_policy(self, policy, self.creation)
+
+		self.has_met_response_sla = "Pending"
+		self.has_met_onsite_sla = "Pending" if has_onsite_target else "N/A"
+
+	def stamp_onsite_arrival(self):
+		"""Section 6. actual_onsite_at has no independent observation in the
+		system -- by decision, it's derived from the transition to In
+		Progress (the field is built read_only, which rules out plain
+		manual entry). Same "only when currently empty" guard as
+		stamp_completion, so re-saving an already-in-progress ticket
+		doesn't move the timestamp. Only flips the verdict when there's an
+		onsite_due to compare against -- a policy with no onsite target
+		stays N/A regardless of status."""
+		if self.status != "In Progress" or self.actual_onsite_at:
+			return
+		self.actual_onsite_at = now_datetime()
+		if self.onsite_due:
+			self.has_met_onsite_sla = "Yes" if self.actual_onsite_at <= self.onsite_due else "No"
+
+	def handle_severity_escalation(self):
+		"""Section 7. Only fires on an actual severity change to an
+		existing ticket. has_value_changed treats a brand-new document as
+		"changed" (there's no previous state to compare against yet), so
+		is_new() is checked first -- otherwise every ticket creation would
+		misread as escalating from nothing to its initial severity."""
+		if self.is_new() or not self.has_value_changed("severity"):
+			return
+
+		_ensure_can_manage_assignments()
+		self.escalate_severity()
+
+	def escalate_severity(self):
+		"""Section 7. Authcor's decision: the clock restarts from the
+		moment of escalation. The history row captures the old severity's
+		response_due and verdict *before* they get overwritten below --
+		that's what stops escalation being used to erase a breach; without
+		it, a ticket that blew its P4 target could be bumped to P1 and
+		appear clean. has_met_response_sla only resets to Pending if the
+		ticket hasn't been responded to yet -- an already-recorded first
+		response isn't rewritten by a later escalation. has_met_onsite_sla
+		gets the same treatment, extended to cover the onsite side (not
+		spelled out in PHASE-3-SLA.md section 7, but the same reasoning:
+		don't rewrite a verdict for something that already happened)."""
+		old_severity = self.get_doc_before_save().severity
+		self.append(
+			"severity_history",
+			{
+				"changed_at": now_datetime(),
+				"changed_by": frappe.session.user,
+				"old_severity": old_severity,
+				"new_severity": self.severity,
+				"old_response_due": self.response_due,
+				"old_verdict": self.has_met_response_sla,
+			},
+		)
+
+		policy = _get_active_sla_policy(self.service_level, self.severity)
+		has_onsite_target = _apply_sla_policy(self, policy, now_datetime())
+
+		if not self.first_response_at:
+			self.has_met_response_sla = "Pending"
+
+		if not has_onsite_target:
+			self.has_met_onsite_sla = "N/A"
+		elif not self.actual_onsite_at:
+			self.has_met_onsite_sla = "Pending"

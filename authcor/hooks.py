@@ -149,23 +149,13 @@ has_permission = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"authcor.tasks.all"
-# 	],
-# 	"daily": [
-# 		"authcor.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"authcor.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"authcor.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"authcor.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"*/15 * * * *": [
+			"authcor.tasks.check_sla_breaches",
+		],
+	},
+}
 
 # Testing
 # -------
