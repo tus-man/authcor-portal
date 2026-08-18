@@ -578,6 +578,62 @@ def remove_engineer(ticket, engineer):
 	return _run_with_lock_retry(_attempt)
 
 
+COUNT_CHANGE_BLOCKED_STATUSES = {"In Progress", "Completed", "Cancelled"}
+
+
+def _recompute_pool_status(doc):
+	"""PHASE-3B-ENGINEER-COUNT.md sections 4-5. Same "only while still in
+	the pool lifecycle" convention as remove_engineer's inline recompute --
+	left untouched at Scheduled or later. Shared by increase_engineer_count
+	and approve_count_request, both of which change engineers_required or
+	assigned_engineers outside the claim/remove paths that already carry
+	their own recompute."""
+	if doc.status not in ("In Pool", "Partially Claimed", "Claimed"):
+		return
+	if not doc.assigned_engineers:
+		doc.status = "In Pool"
+	elif len(doc.assigned_engineers) >= doc.engineers_required:
+		doc.status = "Claimed"
+	else:
+		doc.status = "Partially Claimed"
+
+
+def _ensure_can_increase_count(customer):
+	"""Section 4: the customer's own portal users, plus Ops L1 and Admins --
+	the same "unrestricted" role set that already sees every ticket
+	regardless of customer scoping."""
+	if set(frappe.get_roles()) & UNRESTRICTED_TICKET_ROLES:
+		return
+	_ensure_customer_access(customer)
+
+
+@frappe.whitelist()
+def increase_engineer_count(ticket, new_count):
+	"""Section 4. Increases need no approval -- direct edit to
+	engineers_required, under the ticket lock same as claiming."""
+	new_count = frappe.utils.cint(new_count)
+	customer = frappe.db.get_value("AC Smart Hands Request", ticket, "customer")
+	if customer is None:
+		frappe.throw(_("Ticket {0} not found.").format(ticket))
+	_ensure_can_increase_count(customer)
+
+	def _attempt():
+		doc = frappe.get_doc("AC Smart Hands Request", ticket, for_update=True)
+
+		if new_count <= doc.engineers_required:
+			frappe.throw(_("New Count must be greater than the current Engineers Required."))
+		if doc.status in COUNT_CHANGE_BLOCKED_STATUSES:
+			frappe.throw(_("Cannot change the engineer count once the ticket is {0}.").format(doc.status))
+
+		doc.engineers_required = new_count
+		_recompute_pool_status(doc)
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		return doc
+
+	return _run_with_lock_retry(_attempt)
+
+
 def _get_disclosure_recipients(customer):
 	"""Portal users plus leads/heads, per the notification rules in
 	PLAN.md section 6. Only active portal users -- a deactivated portal
