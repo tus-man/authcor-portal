@@ -1,5 +1,6 @@
 import frappe
-from frappe.utils import now_datetime
+from frappe import _
+from frappe.utils import add_to_date, now_datetime
 
 
 def check_sla_breaches():
@@ -31,3 +32,46 @@ def check_sla_breaches():
 	)
 
 	frappe.db.commit()
+
+
+def send_unlogged_hours_nudges():
+	"""PHASE-4-TIME-EXPENSE.md section 5. Registered in hooks.py under
+	scheduler_events["daily"].
+
+	Not requested by Authcor -- taken from the reference system -- but
+	these hours feed a monthly invoice, so an engineer who forgets to log
+	is revenue Authcor never bills for. Tone is a reminder, not a
+	reprimand.
+
+	AC Time Entry.engineer is a Link to AC Engineer Profile, whose autoname
+	is `field:user` -- so its name already *is* the assigned engineer's
+	user id, comparable directly against AC Ticket Engineer.engineer
+	(a Link to User) with no extra lookup."""
+	cutoff = add_to_date(now_datetime(), hours=-24)
+	tickets = frappe.get_all(
+		"AC Smart Hands Request",
+		filters={"status": "Completed", "completed_on": ["<", cutoff]},
+		pluck="name",
+	)
+
+	for ticket_name in tickets:
+		ticket = frappe.get_doc("AC Smart Hands Request", ticket_name)
+		for row in ticket.assigned_engineers:
+			already_logged = frappe.db.exists(
+				"AC Time Entry", {"ticket": ticket_name, "engineer": row.engineer, "docstatus": 1}
+			)
+			if already_logged:
+				continue
+
+			email = frappe.db.get_value("User", row.engineer, "email")
+			if not email:
+				continue
+
+			frappe.sendmail(
+				recipients=[email],
+				subject=_("Don't forget to log your time for {0}").format(ticket_name),
+				message=_(
+					"Just a friendly reminder -- ticket {0} ({1}) was completed more than a day ago and "
+					"we don't have a time entry from you yet. When you get a chance, please log your hours."
+				).format(ticket_name, ticket.subject),
+			)

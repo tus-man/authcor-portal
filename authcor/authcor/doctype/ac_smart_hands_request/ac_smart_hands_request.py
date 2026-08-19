@@ -636,6 +636,32 @@ def increase_engineer_count(ticket, new_count):
 	return _run_with_lock_retry(_attempt)
 
 
+def recompute_time_expense_rollups(ticket_name):
+	"""PHASE-4-TIME-EXPENSE.md section 4. Full recompute from source rows
+	rather than incremental, so total_hours/total_expenses can never drift
+	from what a submitted AC Time Entry / Approved-or-Reimbursed AC Expense
+	Claim actually shows -- called on time entry submit/cancel and on
+	expense claim approval/reimbursement. Uses frappe.db.set_value's
+	bulk-filter form deliberately, same reasoning as check_sla_breaches: this
+	is a derived total, not a business rule to re-run through the ticket's
+	own validate()."""
+	total_minutes = frappe.db.sql(
+		"select coalesce(sum(duration_minutes), 0) from `tabAC Time Entry` where ticket = %s and docstatus = 1",
+		(ticket_name,),
+	)[0][0]
+	total_expenses = frappe.db.sql(
+		"""select coalesce(sum(amount), 0) from `tabAC Expense Claim`
+		where ticket = %s and status in ('Approved', 'Reimbursed')""",
+		(ticket_name,),
+	)[0][0]
+
+	frappe.db.set_value(
+		"AC Smart Hands Request",
+		ticket_name,
+		{"total_hours": round(total_minutes / 60, 2), "total_expenses": total_expenses},
+	)
+
+
 def _get_disclosure_recipients(customer):
 	"""Portal users plus leads/heads, per the notification rules in
 	PLAN.md section 6. Only active portal users -- a deactivated portal

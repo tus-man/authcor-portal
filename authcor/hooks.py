@@ -128,10 +128,12 @@ app_license = "mit"
 
 permission_query_conditions = {
 	"AC Smart Hands Request": "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.get_permission_query_conditions",
+	"AC Expense Claim": "authcor.authcor.doctype.ac_expense_claim.ac_expense_claim.get_permission_query_conditions",
 }
 
 has_permission = {
 	"AC Smart Hands Request": "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.has_permission",
+	"AC Expense Claim": "authcor.authcor.doctype.ac_expense_claim.ac_expense_claim.has_permission",
 }
 
 # Document Events
@@ -155,6 +157,9 @@ scheduler_events = {
 			"authcor.tasks.check_sla_breaches",
 		],
 	},
+	"daily": [
+		"authcor.tasks.send_unlogged_hours_nudges",
+	],
 }
 
 # Testing
