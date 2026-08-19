@@ -57,6 +57,8 @@
   "onsite_due",
   "first_response_at",
   "first_response_minutes",
+  "total_hours",
+  "total_expenses",
   "column_break_yyra",
   "confirmed_at",
   "confirmation_minutes",
@@ -412,12 +414,24 @@
    "label": "Severity History",
    "options": "AC Severity History",
    "read_only": 1
+  },
+  {
+   "fieldname": "total_hours",
+   "fieldtype": "Float",
+   "label": "Total Hours",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_expenses",
+   "fieldtype": "Currency",
+   "label": "Total Expenses",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 21:53:35.906277",
+ "modified": "2026-08-19 17:45:21.158618",
  "modified_by": "Administrator",
  "module": "Authcor",
  "name": "AC Smart Hands Request",

@@ -1,0 +1,196 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-08-19 17:28:22.462053",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "section_break_wvib",
+  "ticket",
+  "column_break_gueu",
+  "customer",
+  "section_break_xakx",
+  "engineer",
+  "section_break_tnjr",
+  "expense_date",
+  "column_break_ppve",
+  "category",
+  "section_break_dqeg",
+  "description",
+  "section_break_coat",
+  "amount",
+  "receipt",
+  "approved_by",
+  "column_break_wohn",
+  "currency",
+  "status",
+  "approved_on",
+  "section_break_imnv",
+  "rejection_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "AC-EXP-.YYYY.-.#####"
+  },
+  {
+   "fieldname": "section_break_wvib",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "ticket",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Ticket",
+   "options": "AC Smart Hands Request",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_gueu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "AC Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_xakx",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "engineer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Engineer",
+   "options": "AC Engineer Profile",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_tnjr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "expense_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Expense Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ppve",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Category",
+   "options": "Transport\nParking\nTolls\nMeals\nAccommodation\nParts & Consumables\nCourier\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_dqeg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_coat",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "receipt",
+   "fieldtype": "Attach",
+   "label": "Receipt",
+   "reqd": 1
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_wohn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nSubmitted\nApproved\nRejected\nReimbursed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_imnv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "rejection_reason",
+   "fieldtype": "Small Text",
+   "label": "Rejection Reason"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-19 17:41:19.722399",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC Expense Claim",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

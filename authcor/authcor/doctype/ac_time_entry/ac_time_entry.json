@@ -1,0 +1,140 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-08-19 17:06:18.042532",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "ticket",
+  "customer",
+  "engineer",
+  "work_date",
+  "start_time",
+  "end_time",
+  "duration_minutes",
+  "duration_display",
+  "notes",
+  "rate_category",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "AC-TE-.YYYY.-.#####"
+  },
+  {
+   "fieldname": "ticket",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Ticket",
+   "options": "AC Smart Hands Request",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "AC Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "engineer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Engineer",
+   "options": "AC Engineer Profile",
+   "reqd": 1
+  },
+  {
+   "fieldname": "work_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Work Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Start Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Datetime",
+   "label": "End Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "duration_minutes",
+   "fieldtype": "Int",
+   "label": "Duration (min)",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "duration_display",
+   "fieldtype": "Data",
+   "label": "Duration",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "rate_category",
+   "fieldtype": "Select",
+   "label": "Rate Category",
+   "options": "Standard\nAfter Hours\nWeekend\nHoliday",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "AC Time Entry",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-19 17:22:59.808077",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC Time Entry",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
