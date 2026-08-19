@@ -90,3 +90,5 @@ Hard-won; don't rediscover these.
 Phases are defined in `docs/PLAN.md` §8. Work one phase per session. Commit at phase boundaries.
 
 Currently: **Phase 0 — login model.** Magic link confirmed working natively. Remaining: per-role password toggle, break-glass admin exemption, production rate limit.
+
+Claude Code must not edit DocType JSON. If a schema change is needed, say so and stop. File edits don't reach the running site until bench migrate, so the change looks applied but isn't — and the resulting test failures point at the wrong cause.

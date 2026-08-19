@@ -9,6 +9,7 @@ from frappe.utils import now_datetime
 from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request import (
 	COUNT_CHANGE_BLOCKED_STATUSES,
 	UNRESTRICTED_TICKET_ROLES,
+	_ensure_can_request_count_change,
 	_ensure_customer_access,
 	_recompute_pool_status,
 	_run_with_lock_retry,
@@ -62,6 +63,33 @@ class ACEngineerCountRequest(Document):
 
 
 @frappe.whitelist()
+def create_count_request(ticket, requested_count, reason=None):
+	"""Section 8: the non-portal "Change Engineer Count" button's decrease
+	path (Admin/Ops L1 -- the customer-facing button is Phase 7). Client
+	L1/L2 already hold Create on this doctype directly (section 2) and can
+	insert a request from the Desk form as-is; staff generally don't, so
+	this goes through the same role/customer gate as increase_engineer_count
+	and inserts with ignore_permissions rather than depending on a Create
+	grant that section 2 doesn't list for Admin/Ops L1. before_insert and
+	validate_on_creation run exactly as they would for any other insert."""
+	requested_count = frappe.utils.cint(requested_count)
+	customer = frappe.db.get_value("AC Smart Hands Request", ticket, "customer")
+	if customer is None:
+		frappe.throw(_("Ticket {0} not found.").format(ticket))
+	_ensure_can_request_count_change(customer)
+
+	doc = frappe.get_doc(
+		doctype="AC Engineer Count Request",
+		ticket=ticket,
+		requested_count=requested_count,
+		reason=reason,
+	)
+	doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+	return doc
+
+
+@frappe.whitelist()
 def reject_count_request(request, note=None):
 	"""Section 5. The ticket is untouched."""
 	_ensure_can_decide()
@@ -89,7 +117,12 @@ def approve_count_request(request, engineers_to_remove, note=None):
 	named engineers one at a time through remove_engineer -- reusing its
 	Primary-promotion rule rather than reimplementing it, and resolving
 	promotion correctly at each step when several are removed at once --
-	before setting engineers_required and recomputing status."""
+	before setting engineers_required and recomputing status.
+
+	Removals needed is max(0, assigned - requested_count): if the customer
+	reduced the count before anyone (or enough people) claimed, assigned can
+	already be at or below requested_count, and approval should still
+	succeed with nothing to remove rather than being treated as an error."""
 	_ensure_can_decide()
 	if isinstance(engineers_to_remove, str):
 		engineers_to_remove = frappe.parse_json(engineers_to_remove)
@@ -103,7 +136,7 @@ def approve_count_request(request, engineers_to_remove, note=None):
 		if ticket.status in COUNT_CHANGE_BLOCKED_STATUSES:
 			frappe.throw(_("Cannot approve -- the ticket is {0}.").format(ticket.status))
 
-		expected_removals = len(ticket.assigned_engineers) - req.requested_count
+		expected_removals = max(0, len(ticket.assigned_engineers) - req.requested_count)
 		if len(engineers_to_remove) != expected_removals:
 			frappe.throw(
 				_("Exactly {0} engineer(s) must be named for removal, got {1}.").format(

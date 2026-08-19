@@ -348,6 +348,67 @@ class TestEngineerCountChange(IntegrationTestCase):
 		self.assertEqual(reloaded.assigned_engineers[0].assignment_type, "Primary")
 		self.assertEqual(reloaded.engineers_required, 1)
 
+	def test_approve_decrease_with_zero_assigned_succeeds_with_no_removals(self):
+		ticket = self._new_ticket(engineers_required=2)
+
+		request = frappe.get_doc(
+			doctype="AC Engineer Count Request", ticket=ticket.name, requested_count=1
+		).insert(ignore_permissions=True)
+
+		frappe.set_user(self.admin_user.name)
+		approve_count_request(request.name, [])
+
+		reloaded = self._reload(ticket.name)
+		self.assertEqual(len(reloaded.assigned_engineers), 0)
+		self.assertEqual(reloaded.engineers_required, 1)
+		self.assertEqual(reloaded.status, "In Pool")
+
+		reloaded_request = frappe.get_doc("AC Engineer Count Request", request.name)
+		self.assertEqual(reloaded_request.status, "Approved")
+		self.assertEqual(reloaded_request.decided_by, self.admin_user.name)
+
+	def test_approve_decrease_with_fewer_assigned_than_requested_succeeds_with_no_removals(self):
+		ticket = self._new_ticket(engineers_required=3)
+		self._assign(ticket.name, self.engineer_a.name)
+
+		request = frappe.get_doc(
+			doctype="AC Engineer Count Request", ticket=ticket.name, requested_count=2
+		).insert(ignore_permissions=True)
+
+		frappe.set_user(self.admin_user.name)
+		approve_count_request(request.name, [])
+
+		reloaded = self._reload(ticket.name)
+		self.assertEqual({row.engineer for row in reloaded.assigned_engineers}, {self.engineer_a.name})
+		self.assertEqual(reloaded.engineers_required, 2)
+		self.assertEqual(reloaded.status, "Partially Claimed")
+
+		reloaded_request = frappe.get_doc("AC Engineer Count Request", request.name)
+		self.assertEqual(reloaded_request.status, "Approved")
+
+	def test_approve_decrease_with_assigned_equal_to_requested_succeeds_with_no_removals(self):
+		ticket = self._new_ticket(engineers_required=3)
+		self._assign(ticket.name, self.engineer_a.name)
+		self._assign(ticket.name, self.engineer_b.name)
+
+		request = frappe.get_doc(
+			doctype="AC Engineer Count Request", ticket=ticket.name, requested_count=2
+		).insert(ignore_permissions=True)
+
+		frappe.set_user(self.admin_user.name)
+		approve_count_request(request.name, [])
+
+		reloaded = self._reload(ticket.name)
+		self.assertEqual(
+			{row.engineer for row in reloaded.assigned_engineers},
+			{self.engineer_a.name, self.engineer_b.name},
+		)
+		self.assertEqual(reloaded.engineers_required, 2)
+		self.assertEqual(reloaded.status, "Claimed")
+
+		reloaded_request = frappe.get_doc("AC Engineer Count Request", request.name)
+		self.assertEqual(reloaded_request.status, "Approved")
+
 	def test_reject_leaves_ticket_completely_unchanged(self):
 		ticket = self._new_ticket(engineers_required=2)
 		self._assign(ticket.name, self.engineer_a.name)

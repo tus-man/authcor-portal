@@ -21,6 +21,13 @@ const ASSIGNMENT_MANAGER_ROLES = [
 	"Operations L2 Authorizer",
 ];
 
+// PHASE-3B-ENGINEER-COUNT.md section 4/8. Same role set as the server's
+// UNRESTRICTED_TICKET_ROLES -- Ops L2 manages assignments but does not
+// decide the count. This button is the non-portal entry point only; the
+// customer-facing "Request Engineer Change" button is Phase 7.
+const COUNT_CHANGE_ROLES = ["Admin L1", "Admin L2", "Admin L3", "Operations L1 Authorizer"];
+const COUNT_CHANGE_BLOCKED_STATUSES = ["In Progress", "Completed", "Cancelled"];
+
 frappe.ui.form.on("AC Smart Hands Request", {
 	setup(frm) {
 		frm.set_query("country", () => ({
@@ -42,6 +49,8 @@ frappe.ui.form.on("AC Smart Hands Request", {
 
 	refresh(frm) {
 		setup_assignment_buttons(frm);
+		setup_count_change_button(frm);
+		show_pending_count_request_indicator(frm);
 	},
 
 	customer(frm) {
@@ -141,6 +150,98 @@ function remove_engineer(frm) {
 		__("Remove Engineer"),
 		__("Remove")
 	);
+}
+
+// PHASE-3B-ENGINEER-COUNT.md section 8. Increases and decreases both go
+// through this one dialog -- the server decides which path applies, this
+// just routes to increase_engineer_count directly if higher, or creates an
+// AC Engineer Count Request if lower (equal is rejected either way).
+function setup_count_change_button(frm) {
+	if (frm.is_new()) return;
+	if (!frappe.user.has_role(COUNT_CHANGE_ROLES)) return;
+	if (COUNT_CHANGE_BLOCKED_STATUSES.includes(frm.doc.status)) return;
+
+	frm.add_custom_button(__("Change Engineer Count"), () => change_engineer_count(frm));
+}
+
+function change_engineer_count(frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "new_count",
+				fieldtype: "Int",
+				label: __("New Engineer Count"),
+				reqd: 1,
+				default: frm.doc.engineers_required,
+			},
+			{
+				fieldname: "reason",
+				fieldtype: "Small Text",
+				label: __("Reason"),
+			},
+		],
+		(values) => {
+			if (values.new_count === frm.doc.engineers_required) {
+				frappe.msgprint(__("New count is the same as the current count -- nothing to change."));
+				return;
+			}
+
+			if (values.new_count > frm.doc.engineers_required) {
+				frappe.call({
+					method: "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.increase_engineer_count",
+					args: { ticket: frm.doc.name, new_count: values.new_count },
+					freeze: true,
+					callback() {
+						frm.reload_doc();
+					},
+				});
+			} else {
+				frappe.call({
+					method: "authcor.authcor.doctype.ac_engineer_count_request.ac_engineer_count_request.create_count_request",
+					args: {
+						ticket: frm.doc.name,
+						requested_count: values.new_count,
+						reason: values.reason,
+					},
+					freeze: true,
+					callback() {
+						frappe.show_alert({
+							message: __("Engineer count reduction request submitted for approval."),
+							indicator: "green",
+						});
+						frm.reload_doc();
+					},
+				});
+			}
+		},
+		__("Change Engineer Count"),
+		__("Submit")
+	);
+}
+
+// PHASE-3B-ENGINEER-COUNT.md section 8. Visible to anyone who can read the
+// ticket -- including an assigned Ops L2/L3 engineer -- so a reduction
+// under consideration isn't a surprise.
+function show_pending_count_request_indicator(frm) {
+	if (frm.is_new()) return;
+
+	frappe.db
+		.get_list("AC Engineer Count Request", {
+			filters: { ticket: frm.doc.name, status: "Pending" },
+			fields: ["name", "requested_count"],
+			limit: 1,
+		})
+		.then((rows) => {
+			if (!rows || !rows.length) return;
+			const request = rows[0];
+			frm.dashboard.set_headline_alert(
+				`<a href="/app/ac-engineer-count-request/${request.name}">${__(
+					"A request to reduce the engineer count to {0} is pending approval.",
+					[request.requested_count]
+				)}</a>`,
+				"orange"
+			);
+		});
 }
 
 function refresh_allowed_countries(frm) {

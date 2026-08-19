@@ -598,10 +598,12 @@ def _recompute_pool_status(doc):
 		doc.status = "Partially Claimed"
 
 
-def _ensure_can_increase_count(customer):
-	"""Section 4: the customer's own portal users, plus Ops L1 and Admins --
-	the same "unrestricted" role set that already sees every ticket
-	regardless of customer scoping."""
+def _ensure_can_request_count_change(customer):
+	"""Sections 4/8: who may *ask* for an engineer count change is one rule
+	regardless of direction -- the customer's own portal users, plus Ops L1
+	and Admins, the same "unrestricted" role set that already sees every
+	ticket regardless of customer scoping. Shared by increase_engineer_count
+	and AC Engineer Count Request's create_count_request."""
 	if set(frappe.get_roles()) & UNRESTRICTED_TICKET_ROLES:
 		return
 	_ensure_customer_access(customer)
@@ -615,7 +617,7 @@ def increase_engineer_count(ticket, new_count):
 	customer = frappe.db.get_value("AC Smart Hands Request", ticket, "customer")
 	if customer is None:
 		frappe.throw(_("Ticket {0} not found.").format(ticket))
-	_ensure_can_increase_count(customer)
+	_ensure_can_request_count_change(customer)
 
 	def _attempt():
 		doc = frappe.get_doc("AC Smart Hands Request", ticket, for_update=True)

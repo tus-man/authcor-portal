@@ -138,10 +138,10 @@ Wire into Phase 5 rather than building now, but the events are:
 
 Buttons on the ticket, in the existing client script:
 
-- **Request Engineer Change** — customer portal users. Opens a small dialog for the new count and a reason. Routes to `increase_engineer_count` directly if higher, or creates a request if lower.
-- **Approve / Reject** — on the request form, for Admins and Ops L1. Approve opens a multi-select of currently assigned engineers, constrained to exactly the number that must go.
+- **Request Engineer Change** — customer portal users. Opens a small dialog for the new count and a reason. Routes to `increase_engineer_count` directly if higher, or creates a request if lower. **Phase 7** — the customer portal doesn't exist yet, so this entry point isn't built. Built now: the same routing, as a Desk-only **Change Engineer Count** button restricted to Admin L1/L2/L3 and Ops L1 (`COUNT_CHANGE_ROLES` in `ac_smart_hands_request.js`). The decrease path calls a new whitelisted `create_count_request(ticket, requested_count, reason)` rather than `frappe.client.insert` directly, because section 2's permission table only grants Client L1/L2 Create on this doctype — Admin/Ops L1 don't hold it. `create_count_request` gates on the same role/customer check as `increase_engineer_count` (`_ensure_can_request_count_change`, renamed from `_ensure_can_increase_count` since both directions now share it) and inserts with `ignore_permissions=True`, same pattern as `add_engineer`/`remove_engineer` bypassing fine-grained doc permissions after their own role check. Phase 7's portal button can call the same method once it exists.
+- **Approve / Reject** — on the request form, for Admins and Ops L1. Approve opens a multi-select of currently assigned engineers, constrained to exactly the number that must go. Built as a `MultiCheck` dialog field, populated by fetching the ticket's `assigned_engineers` via `frappe.model.with_doc` — not from this request's own `current_count` snapshot, since assignments can have moved since the request was raised. The required-removal count (and `approve_count_request` itself) is still computed from the live ticket, so a stale selection just fails server-side with a clear error.
 
-A pending request should be visible on the ticket itself — an indicator or a linked-document panel — so an engineer opening their ticket can see a reduction is under consideration.
+A pending request should be visible on the ticket itself — an indicator or a linked-document panel — so an engineer opening their ticket can see a reduction is under consideration. Built as a dashboard headline alert on the ticket form, linking to the pending `AC Engineer Count Request`.
 
 ---
 
