@@ -88,7 +88,15 @@ def _grant_customer_access(user, customer):
 	"""Mirrors how a Client L1/L2 portal user's visibility is actually
 	scoped in production -- a User Permission binding them to their own
 	AC Customer, on top of the doctype-level read/create role permission
-	(PHASE-3B-ENGINEER-COUNT.md section 2)."""
+	(PHASE-3B-ENGINEER-COUNT.md section 2).
+
+	Get-or-create: User Permission's own validate() rejects a second
+	identical (user, allow, for_value) row with DuplicateEntryError
+	regardless of its own random autoname -- same leftover-from-an-
+	interrupted-run failure mode as a fixed-name insert, just enforced by
+	the doctype's own business logic instead of the primary key."""
+	if frappe.db.exists("User Permission", {"user": user, "allow": "AC Customer", "for_value": customer}):
+		return
 	frappe.get_doc(
 		doctype="User Permission",
 		user=user,

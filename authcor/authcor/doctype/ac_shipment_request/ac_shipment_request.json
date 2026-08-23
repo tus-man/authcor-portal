@@ -35,7 +35,7 @@
   "stored_on",
   "receipt_and_status_section",
   "status",
-  "receipt_prrof",
+  "receipt_proof",
   "column_break_evdc",
   "actual_delivery",
   "received_by"
@@ -199,17 +199,12 @@
    "label": "Receipt and Status"
   },
   {
+   "default": "Open",
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
    "options": "Open\nReceived\nClosed\nCancelled",
    "read_only": 1
-  },
-  {
-   "fieldname": "receipt_prrof",
-   "fieldtype": "Table",
-   "label": "Receipt Proof",
-   "options": "AC Proof Image"
   },
   {
    "fieldname": "column_break_evdc",
@@ -226,12 +221,18 @@
    "fieldtype": "Link",
    "label": "Received By",
    "options": "AC Engineer Profile"
+  },
+  {
+   "fieldname": "receipt_proof",
+   "fieldtype": "Table",
+   "label": "Receipt Proof",
+   "options": "AC Proof Image"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-23 19:18:19.797281",
+ "modified": "2026-08-23 20:26:21.866506",
  "modified_by": "Administrator",
  "module": "Authcor",
  "name": "AC Shipment Request",

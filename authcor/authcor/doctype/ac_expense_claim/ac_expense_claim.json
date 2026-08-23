@@ -144,6 +144,7 @@
    "reqd": 1
   },
   {
+   "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
@@ -171,7 +172,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-23 18:01:22.003214",
+ "modified": "2026-08-23 20:26:41.569950",
  "modified_by": "Administrator",
  "module": "Authcor",
  "name": "AC Expense Claim",
