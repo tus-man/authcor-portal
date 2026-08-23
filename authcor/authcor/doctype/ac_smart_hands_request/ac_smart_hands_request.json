@@ -57,8 +57,6 @@
   "onsite_due",
   "first_response_at",
   "first_response_minutes",
-  "total_hours",
-  "total_expenses",
   "column_break_yyra",
   "confirmed_at",
   "confirmation_minutes",
@@ -66,6 +64,10 @@
   "actual_onsite_at",
   "has_met_response_sla",
   "has_met_onsite_sla",
+  "work_summary_section",
+  "total_hours",
+  "column_break_wscs",
+  "total_expenses",
   "section_break_unxo",
   "severity_history"
  ],
@@ -143,10 +145,11 @@
    "reqd": 1
   },
   {
+   "default": "Smart Hands",
    "fieldname": "action_required",
    "fieldtype": "Select",
    "label": "Action Required",
-   "options": "Remote Hands\nBreak-fix\nInstallation\nDecommission\nCabling\nOthers",
+   "options": "Smart Hands\nOthers",
    "reqd": 1
   },
   {
@@ -161,12 +164,12 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "In Pool",
+   "default": "Open",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "In Pool\nPartially Claimed\nClaimed\nScheduled\nIn Progress\nCompleted\nCancelled"
+   "options": "Open\nPartially Claimed\nClaimed\nScheduled\nIn Progress\nCompleted\nClosed\nCancelled"
   },
   {
    "depends_on": "eval:doc.status==\"Completed\"",
@@ -327,30 +330,34 @@
   {
    "fieldname": "performance_section",
    "fieldtype": "Section Break",
-   "label": "Performance"
+   "label": "SLA Performance"
   },
   {
    "fieldname": "sla_policy",
    "fieldtype": "Link",
    "label": "SLA Policy",
-   "options": "AC SLA Policy"
+   "options": "AC SLA Policy",
+   "permlevel": 1
   },
   {
    "fieldname": "response_due",
    "fieldtype": "Datetime",
    "label": "Response Due",
+   "permlevel": 1,
    "read_only": 1
   },
   {
    "fieldname": "onsite_due",
    "fieldtype": "Datetime",
    "label": "Onsite Due",
+   "permlevel": 1,
    "read_only": 1
   },
   {
    "fieldname": "first_response_at",
    "fieldtype": "Datetime",
    "label": "First Response At",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -358,6 +365,7 @@
    "fieldtype": "Int",
    "label": "First Response (min)",
    "non_negative": 1,
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -368,6 +376,7 @@
    "fieldname": "confirmed_at",
    "fieldtype": "Datetime",
    "label": "Confirmed At",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -375,6 +384,7 @@
    "fieldtype": "Int",
    "label": "Confirmation (min)",
    "non_negative": 1,
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -382,12 +392,14 @@
    "fieldtype": "Int",
    "label": "Idle Time (min)",
    "non_negative": 1,
+   "permlevel": 1,
    "read_only": 1
   },
   {
    "fieldname": "actual_onsite_at",
    "fieldtype": "Datetime",
    "label": "Actual Onsite At",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -395,6 +407,7 @@
    "fieldtype": "Select",
    "label": "Met Response SLA",
    "options": "Pending\nYes\nNo",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -402,6 +415,7 @@
    "fieldtype": "Select",
    "label": "Met Onsite SLA",
    "options": "Pending\nYes\nNo\nN/A",
+   "permlevel": 1,
    "read_only": 1
   },
   {
@@ -426,12 +440,21 @@
    "fieldtype": "Currency",
    "label": "Total Expenses",
    "read_only": 1
+  },
+  {
+   "fieldname": "work_summary_section",
+   "fieldtype": "Section Break",
+   "label": "Work Summary"
+  },
+  {
+   "fieldname": "column_break_wscs",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-19 17:45:21.158618",
+ "modified": "2026-08-23 17:58:28.528272",
  "modified_by": "Administrator",
  "module": "Authcor",
  "name": "AC Smart Hands Request",

@@ -127,6 +127,7 @@
   {
    "fieldname": "approved_by",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Approved By",
    "options": "User",
    "read_only": 1
@@ -146,12 +147,13 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Draft\nSubmitted\nApproved\nRejected\nReimbursed",
+   "options": "Draft\nSubmitted\nReimbursed",
    "read_only": 1
   },
   {
    "fieldname": "approved_on",
    "fieldtype": "Datetime",
+   "hidden": 1,
    "label": "Approved On",
    "read_only": 1
   },
@@ -162,13 +164,14 @@
   {
    "fieldname": "rejection_reason",
    "fieldtype": "Small Text",
+   "hidden": 1,
    "label": "Rejection Reason"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-19 17:41:19.722399",
+ "modified": "2026-08-23 18:01:22.003214",
  "modified_by": "Administrator",
  "module": "Authcor",
  "name": "AC Expense Claim",
