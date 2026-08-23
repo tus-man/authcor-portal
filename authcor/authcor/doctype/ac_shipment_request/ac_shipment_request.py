@@ -12,6 +12,17 @@ from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request impor
 	SCOPED_TICKET_ROLES,
 	UNRESTRICTED_TICKET_ROLES,
 )
+from authcor.notifications import notify
+from authcor.notifications.context import (
+	shipment_closed_context,
+	shipment_created_context,
+	shipment_received_context,
+)
+from authcor.notifications.recipients import (
+	resolve_shipment_closed,
+	resolve_shipment_created,
+	resolve_shipment_received,
+)
 
 # Section 5. One small map in code, not on the DocType -- these change
 # occasionally and a code change is easier to review than a data edit.
@@ -115,6 +126,47 @@ class ACShipmentRequest(Document):
 		Draft."""
 		if not self.status:
 			self.status = "Open"
+
+	def after_insert(self):
+		"""PHASE-5-NOTIFICATIONS.md section 3: shipment_created."""
+		notify(
+			event_key="shipment_created",
+			reference_doctype="AC Shipment Request",
+			reference_name=self.name,
+			recipients=resolve_shipment_created(self),
+			context=shipment_created_context(self),
+			subject=_("[{0}] New shipment -- {1}").format(self.name, self.subject),
+		)
+
+	def on_update(self):
+		"""PHASE-5-NOTIFICATIONS.md section 3: shipment_received/
+		shipment_closed. Same is_new()/get_doc_before_save() guard as the
+		ticket's own on_update -- nothing to compare a brand-new document
+		against, and after_insert above already covers creation."""
+		if self.is_new():
+			return
+		if self.get_doc_before_save() is None:
+			return
+
+		if self.has_value_changed("status") and self.status == "Received":
+			notify(
+				event_key="shipment_received",
+				reference_doctype="AC Shipment Request",
+				reference_name=self.name,
+				recipients=resolve_shipment_received(self),
+				context=shipment_received_context(self),
+				subject=_("[{0}] Shipment received -- {1}").format(self.name, self.subject),
+			)
+
+		if self.has_value_changed("status") and self.status == "Closed":
+			notify(
+				event_key="shipment_closed",
+				reference_doctype="AC Shipment Request",
+				reference_name=self.name,
+				recipients=resolve_shipment_closed(self),
+				context=shipment_closed_context(self),
+				subject=_("[{0}] Shipment closed -- {1}").format(self.name, self.subject),
+			)
 
 	def validate(self):
 		self.validate_carrier_other()

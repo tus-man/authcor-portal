@@ -1,0 +1,6 @@
+<p>A request to reduce the engineer count on ticket <strong>{{ ticket_name }}</strong> has been raised.</p>
+<table>
+	<tr><td>Current count</td><td>{{ current_count }}</td></tr>
+	<tr><td>Requested count</td><td>{{ requested_count }}</td></tr>
+	{% if reason %}<tr><td>Reason</td><td>{{ reason }}</td></tr>{% endif %}
+</table>

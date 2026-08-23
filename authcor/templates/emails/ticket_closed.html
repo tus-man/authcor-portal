@@ -1,0 +1,23 @@
+<p>Ticket <strong>{{ ticket_name }}</strong> ({{ subject }}) is now closed. Here's the work summary.</p>
+
+<p><strong>Hours</strong></p>
+<table border="1" cellpadding="4" cellspacing="0">
+	<tr><th>Engineer</th><th>Hours</th></tr>
+	{% for row in engineer_hours %}
+	<tr><td>{{ row.engineer }}</td><td>{{ row.hours }}</td></tr>
+	{% endfor %}
+	<tr><td><strong>Total</strong></td><td><strong>{{ total_hours }}</strong></td></tr>
+</table>
+
+<p><strong>Expenses</strong></p>
+{% if expenses %}
+<table border="1" cellpadding="4" cellspacing="0">
+	<tr><th>Category</th><th>Description</th><th>Amount</th></tr>
+	{% for claim in expenses %}
+	<tr><td>{{ claim.category }}</td><td>{{ claim.description }}</td><td>{{ claim.currency }} {{ claim.amount }}</td></tr>
+	{% endfor %}
+	<tr><td colspan="2"><strong>Total</strong></td><td><strong>{{ total_expenses }}</strong></td></tr>
+</table>
+{% else %}
+<p>No expenses were claimed on this ticket.</p>
+{% endif %}

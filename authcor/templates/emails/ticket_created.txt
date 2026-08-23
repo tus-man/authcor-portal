@@ -1,0 +1,8 @@
+A new Smart Hands ticket has been raised.
+
+Ticket: {{ ticket_name }}
+Subject: {{ subject }}
+Severity: {{ severity }}
+City: {{ city }}
+
+Please log in to the Authcor portal to review and claim it.

@@ -1,0 +1,3 @@
+<p>Your shipment <strong>{{ shipment_name }}</strong> ({{ subject }}) has arrived safely.</p>
+<p>Received on: {{ actual_delivery }}</p>
+{% if receipt_image_url %}<p><img src="{{ receipt_image_url }}" alt="Receipt photograph" style="max-width:400px;"></p>{% endif %}

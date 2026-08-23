@@ -1,0 +1,3 @@
+{{ engineer_name }}'s FIN expires on {{ id_expiry }}, within the next 60 days.
+
+An expired FIN cannot be dispatched -- please arrange renewal ahead of this date.

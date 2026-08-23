@@ -161,6 +161,10 @@ scheduler_events = {
 	},
 	"daily": [
 		"authcor.tasks.send_unlogged_hours_nudges",
+		"authcor.tasks.send_shipment_overdue_alerts",
+	],
+	"weekly": [
+		"authcor.tasks.send_fin_expiry_warnings",
 	],
 }
 

@@ -15,6 +15,9 @@ from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request impor
 	_run_with_lock_retry,
 	remove_engineer,
 )
+from authcor.notifications import notify
+from authcor.notifications.context import count_request_context, count_request_decided_context
+from authcor.notifications.recipients import resolve_count_request_decided, resolve_count_request_raised
 
 
 def _ensure_can_decide():
@@ -86,6 +89,15 @@ def create_count_request(ticket, requested_count, reason=None):
 	)
 	doc.insert(ignore_permissions=True)
 	frappe.db.commit()
+
+	notify(
+		event_key="count_request_raised",
+		reference_doctype="AC Engineer Count Request",
+		reference_name=doc.name,
+		recipients=resolve_count_request_raised(doc),
+		context=count_request_context(doc),
+		subject=_("[{0}] Engineer count reduction requested").format(doc.ticket),
+	)
 	return doc
 
 
@@ -107,7 +119,16 @@ def reject_count_request(request, note=None):
 		frappe.db.commit()
 		return req
 
-	return _run_with_lock_retry(_attempt)
+	result = _run_with_lock_retry(_attempt)
+	notify(
+		event_key="count_request_decided",
+		reference_doctype="AC Engineer Count Request",
+		reference_name=result.name,
+		recipients=resolve_count_request_decided(result),
+		context=count_request_decided_context(result),
+		subject=_("[{0}] Engineer count reduction request rejected").format(result.ticket),
+	)
+	return result
 
 
 @frappe.whitelist()
@@ -172,7 +193,16 @@ def approve_count_request(request, engineers_to_remove, note=None):
 		frappe.db.commit()
 		return req
 
-	return _run_with_lock_retry(_finalize)
+	result = _run_with_lock_retry(_finalize)
+	notify(
+		event_key="count_request_decided",
+		reference_doctype="AC Engineer Count Request",
+		reference_name=result.name,
+		recipients=resolve_count_request_decided(result, affected_engineers=engineers_to_remove),
+		context=count_request_decided_context(result),
+		subject=_("[{0}] Engineer count reduction request approved").format(result.ticket),
+	)
+	return result
 
 
 @frappe.whitelist()

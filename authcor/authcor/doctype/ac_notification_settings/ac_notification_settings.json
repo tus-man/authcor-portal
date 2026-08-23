@@ -1,0 +1,64 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-08-23 21:43:47.181916",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "notification_enabled",
+  "telegram_enabled",
+  "telegram_bot_token",
+  "telegram_webhook_secret"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "notification_enabled",
+   "fieldtype": "Check",
+   "label": "Notification Enabled"
+  },
+  {
+   "default": "0",
+   "fieldname": "telegram_enabled",
+   "fieldtype": "Check",
+   "label": "Telegram Enabled"
+  },
+  {
+   "fieldname": "telegram_bot_token",
+   "fieldtype": "Password",
+   "label": "Telegram Bot Token"
+  },
+  {
+   "fieldname": "telegram_webhook_secret",
+   "fieldtype": "Password",
+   "label": "Telegram Webhook Secret"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-23 21:46:52.742621",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC Notification Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

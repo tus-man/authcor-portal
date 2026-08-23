@@ -1,0 +1,5 @@
+A new shipment has been logged.
+
+Shipment: {{ shipment_name }}
+Subject: {{ subject }}
+Carrier: {{ carrier }}

@@ -1,0 +1,3 @@
+An engineer has been assigned to ticket {{ ticket_name }} ({{ subject }}).
+
+You'll receive their details separately once assigned.

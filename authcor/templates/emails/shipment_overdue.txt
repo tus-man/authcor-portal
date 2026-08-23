@@ -1,0 +1,1 @@
+Shipment {{ shipment_name }} ({{ subject }}) is still Open, more than 3 days past its expected delivery of {{ expected_delivery }}.

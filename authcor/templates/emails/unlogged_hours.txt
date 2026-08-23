@@ -1,0 +1,3 @@
+Just a friendly reminder -- ticket {{ ticket_name }} ({{ subject }}) was completed more than a day ago and we don't have a time entry from you yet.
+
+When you get a chance, please log your hours.

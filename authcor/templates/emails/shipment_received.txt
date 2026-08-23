@@ -1,0 +1,5 @@
+Your shipment {{ shipment_name }} ({{ subject }}) has arrived safely.
+
+Received on: {{ actual_delivery }}
+{% if receipt_image_url %}A receipt photograph is available in the portal: {{ receipt_image_url }}
+{% endif %}

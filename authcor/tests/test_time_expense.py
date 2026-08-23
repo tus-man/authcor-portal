@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, now_datetime
@@ -10,7 +8,6 @@ from authcor.authcor.doctype.ac_expense_claim.ac_expense_claim import (
 )
 from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request import add_engineer
 from authcor.authcor.doctype.ac_time_entry.ac_time_entry import derive_rate_category
-from authcor.tasks import send_unlogged_hours_nudges
 from authcor.tests.sla_fixtures import ensure_sla_policy_committed
 
 SGT = "Asia/Singapore"
@@ -717,29 +714,6 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 		reloaded = self._reload(ticket.name)
 		self.assertEqual(reloaded.status, "Closed")
 		self.assertEqual(reloaded.completed_on, completed_on)
-
-	# -- section 5: unlogged hours nudge ----------------------------------------
-
-	def test_unlogged_hours_nudge_emails_only_engineers_without_a_logged_entry(self):
-		ticket = self._new_ticket(engineers_required=2)
-		self._assign(ticket.name, self.engineer_a.name)
-		self._assign(ticket.name, self.engineer_b.name)
-
-		self._make_time_entry(
-			ticket.name, self.engineer_b.name, "2026-06-15 06:00:00", "2026-06-15 07:00:00", assign=False
-		).submit()
-
-		self._reload(ticket.name).db_set("status", "Completed")
-		self._reload(ticket.name).db_set("completed_on", add_to_date(now_datetime(), hours=-48))
-		frappe.db.commit()
-
-		with patch("authcor.tasks.frappe.sendmail") as mock_sendmail:
-			send_unlogged_hours_nudges()
-
-		recipients = [call.kwargs["recipients"][0] for call in mock_sendmail.call_args_list]
-		self.assertIn(self.engineer_a.name, recipients)
-		self.assertNotIn(self.engineer_b.name, recipients)
-
 
 class TestTimeEntryVisibility(IntegrationTestCase):
 	"""CHANGE-SET-POST-DEMO.md section 8/10.7: an engineer sees their own

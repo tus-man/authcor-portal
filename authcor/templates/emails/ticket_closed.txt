@@ -1,0 +1,11 @@
+Ticket {{ ticket_name }} ({{ subject }}) is now closed. Here's the work summary.
+
+Hours
+{% for row in engineer_hours %}{{ row.engineer }}: {{ row.hours }}
+{% endfor %}Total: {{ total_hours }}
+
+Expenses
+{% if expenses %}{% for claim in expenses %}{{ claim.category }} -- {{ claim.description }}: {{ claim.currency }} {{ claim.amount }}
+{% endfor %}Total: {{ total_expenses }}
+{% else %}No expenses were claimed on this ticket.
+{% endif %}

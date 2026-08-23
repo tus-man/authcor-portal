@@ -1,0 +1,1 @@
+Ticket {{ ticket_name }} ({{ subject }}) has been escalated from {{ old_severity }} to {{ new_severity }}.

@@ -1,0 +1,4 @@
+Escalation rule {{ rule_name }} has fired for ticket {{ ticket_name }} ({{ subject }}).
+
+Trigger: {{ trigger }}
+Over threshold by: {{ minutes_over }} minutes

@@ -1,0 +1,4 @@
+The engineer count change request on ticket {{ ticket_name }} has been {{ status }}.
+
+Current count: {{ current_count }}
+Requested count: {{ requested_count }}

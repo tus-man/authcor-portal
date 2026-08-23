@@ -1,0 +1,4 @@
+The visit slot for ticket {{ ticket_name }} ({{ subject }}) has been confirmed.
+
+Date: {{ confirmed_date }}
+Time: {{ confirmed_time }}

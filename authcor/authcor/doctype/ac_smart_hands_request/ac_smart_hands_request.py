@@ -10,6 +10,28 @@ from frappe.model.document import Document
 from frappe.utils import add_days, get_datetime, get_time, getdate, now_datetime
 from frappe.utils.password import get_decrypted_password
 
+from authcor.notifications import notify
+from authcor.notifications.context import (
+	build_ticket_closed_context,
+	engineer_removed_context,
+	severity_escalated_context,
+	slot_confirmed_context,
+	ticket_claimed_context,
+	ticket_completed_context,
+	ticket_created_context,
+	ticket_in_progress_context,
+)
+from authcor.notifications.recipients import (
+	resolve_engineer_removed,
+	resolve_severity_escalated,
+	resolve_slot_confirmed,
+	resolve_ticket_claimed,
+	resolve_ticket_closed,
+	resolve_ticket_completed,
+	resolve_ticket_created,
+	resolve_ticket_in_progress,
+)
+
 
 def resolve_owning_slot(confirmed_date, confirmed_time):
 	"""Given a confirmed date and a time-of-day, return (owning_date,
@@ -575,7 +597,20 @@ def remove_engineer(ticket, engineer):
 		frappe.db.commit()
 		return doc
 
-	return _run_with_lock_retry(_attempt)
+	result = _run_with_lock_retry(_attempt)
+
+	# PHASE-5-NOTIFICATIONS.md section 3: engineer_removed, fired after
+	# the removal has committed -- not from inside _attempt, so a
+	# QueryDeadlockError retry can't notify the same removal twice.
+	notify(
+		event_key="engineer_removed",
+		reference_doctype="AC Smart Hands Request",
+		reference_name=result.name,
+		recipients=resolve_engineer_removed(engineer),
+		context=engineer_removed_context(result.name, result.subject),
+		subject=_("[{0}] You have been removed -- {1}").format(result.name, result.subject),
+	)
+	return result
 
 
 COUNT_CHANGE_BLOCKED_STATUSES = {"In Progress", "Completed", "Closed", "Cancelled"}
@@ -742,6 +777,101 @@ class ACSmartHandsRequest(Document):
 	def before_insert(self):
 		self.generate_preferred_slots()
 		self.apply_initial_sla_policy()
+
+	def after_insert(self):
+		"""PHASE-5-NOTIFICATIONS.md section 3: ticket_created. Fires once,
+		here, rather than being folded into on_update's change-detection --
+		there's nothing to "detect a change" against on a brand-new
+		document."""
+		notify(
+			event_key="ticket_created",
+			reference_doctype="AC Smart Hands Request",
+			reference_name=self.name,
+			recipients=resolve_ticket_created(self),
+			context=ticket_created_context(self),
+			subject=_("[{0}] New ticket -- {1}").format(self.name, self.subject),
+		)
+
+	def on_update(self):
+		"""PHASE-5-NOTIFICATIONS.md sections 1/3: "fire after the transaction
+		commits, not during validation" -- on_update runs after validate()
+		has already decided the save is going through, never from inside
+		it. Skipped entirely for a new document: has_value_changed treats a
+		brand-new document as "changed" against nothing, the same reason
+		handle_severity_escalation guards on is_new() -- after_insert
+		above is the one and only creation notification."""
+		if self.is_new():
+			return
+		previous = self.get_doc_before_save()
+		if previous is None:
+			return
+
+		if (
+			self.has_value_changed("status")
+			and previous.status == "Open"
+			and self.status in ("Partially Claimed", "Claimed")
+		):
+			notify(
+				event_key="ticket_claimed",
+				reference_doctype="AC Smart Hands Request",
+				reference_name=self.name,
+				recipients=resolve_ticket_claimed(self),
+				context=ticket_claimed_context(self),
+				subject=_("[{0}] Engineer assigned -- {1}").format(self.name, self.subject),
+			)
+
+		if self.has_value_changed("confirmed_datetime") and self.confirmed_datetime and not previous.confirmed_datetime:
+			notify(
+				event_key="slot_confirmed",
+				reference_doctype="AC Smart Hands Request",
+				reference_name=self.name,
+				recipients=resolve_slot_confirmed(self),
+				context=slot_confirmed_context(self),
+				subject=_("[{0}] Visit confirmed -- {1}").format(self.name, self.subject),
+			)
+
+		if self.has_value_changed("status") and self.status == "In Progress":
+			notify(
+				event_key="ticket_in_progress",
+				reference_doctype="AC Smart Hands Request",
+				reference_name=self.name,
+				recipients=resolve_ticket_in_progress(self),
+				context=ticket_in_progress_context(self),
+				subject=_("[{0}] Engineer on site -- {1}").format(self.name, self.subject),
+			)
+
+		if self.has_value_changed("status") and self.status == "Completed":
+			notify(
+				event_key="ticket_completed",
+				reference_doctype="AC Smart Hands Request",
+				reference_name=self.name,
+				recipients=resolve_ticket_completed(self),
+				context=ticket_completed_context(self),
+				subject=_("[{0}] Work completed -- {1}").format(self.name, self.subject),
+			)
+
+		if self.has_value_changed("status") and self.status == "Closed":
+			notify(
+				event_key="ticket_closed",
+				reference_doctype="AC Smart Hands Request",
+				reference_name=self.name,
+				recipients=resolve_ticket_closed(self),
+				# section 3: rendered from a function that reads only
+				# permlevel 0 fields off a fresh DB read, by name -- never
+				# self, which would hand Jinja the whole document.
+				context=build_ticket_closed_context(self.name),
+				subject=_("[{0}] Ticket closed -- {1}").format(self.name, self.subject),
+			)
+
+		if self.has_value_changed("severity"):
+			notify(
+				event_key="severity_escalated",
+				reference_doctype="AC Smart Hands Request",
+				reference_name=self.name,
+				recipients=resolve_severity_escalated(self),
+				context=severity_escalated_context(self),
+				subject=_("[{0}] Severity escalated to {1} -- {2}").format(self.name, self.severity, self.subject),
+			)
 
 	def validate(self):
 		self.validate_engineers_required()

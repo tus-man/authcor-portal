@@ -1,0 +1,1 @@
+You have been removed from ticket {{ ticket_name }} ({{ subject }}).

@@ -87,6 +87,7 @@ Hard-won; don't rediscover these.
 - NRIC/FIN uses the `Password` fieldtype (encrypted at rest) plus permlevel restriction. It is PDPA-regulated — see `docs/PLAN.md` §9 before touching anything that reads or transmits it.
 - Rate and billable-amount fields sit at permlevel 1 and must never be exposed to client-facing roles.
 - Never run `bench migrate` against production.
+- Committing and non-committing fixtures cannot be mixed in one test class. Once anything in the class commits — including indirectly, via code under test that commits — every fixture created in setUpClass is committed too, whether intended or not, and survives the per-test rollback. Any class whose code path commits must use the committing fixture helpers throughout and register addClassCleanup for all of them. Symptoms are stale records and failures that appear on a reused dev site but pass in CI
 
 ## Build order
 

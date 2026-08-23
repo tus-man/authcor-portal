@@ -1,0 +1,6 @@
+A request to reduce the engineer count on ticket {{ ticket_name }} has been raised.
+
+Current count: {{ current_count }}
+Requested count: {{ requested_count }}
+{% if reason %}Reason: {{ reason }}
+{% endif %}
