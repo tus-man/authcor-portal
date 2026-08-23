@@ -26,7 +26,7 @@ const ASSIGNMENT_MANAGER_ROLES = [
 // decide the count. This button is the non-portal entry point only; the
 // customer-facing "Request Engineer Change" button is Phase 7.
 const COUNT_CHANGE_ROLES = ["Admin L1", "Admin L2", "Admin L3", "Operations L1 Authorizer"];
-const COUNT_CHANGE_BLOCKED_STATUSES = ["In Progress", "Completed", "Cancelled"];
+const COUNT_CHANGE_BLOCKED_STATUSES = ["In Progress", "Completed", "Closed", "Cancelled"];
 
 frappe.ui.form.on("AC Smart Hands Request", {
 	setup(frm) {
@@ -42,6 +42,7 @@ frappe.ui.form.on("AC Smart Hands Request", {
 	},
 
 	onload(frm) {
+		populate_preferred_slots(frm);
 		refresh_allowed_countries(frm);
 		refresh_allowed_cities(frm);
 		refresh_allowed_data_centers(frm);
@@ -242,6 +243,33 @@ function show_pending_count_request_indicator(frm) {
 				"orange"
 			);
 		});
+}
+
+// CHANGE-SET-POST-DEMO.md section 5/10.6. Generated client-side so the
+// customer sees their offered availability the moment they open a new
+// ticket, not only after the first save -- a customer who never reopens a
+// saved ticket would otherwise have offered availability they never saw.
+// Mirrors generate_preferred_slots in ac_smart_hands_request.py exactly
+// (seven days starting tomorrow, all three bands ticked); that
+// before_insert generation stays in place as the fallback for
+// API-created tickets. Both are guarded on the table being empty, so
+// whichever path runs first is the only one that ever adds rows -- they
+// can't both fire and produce fourteen.
+function populate_preferred_slots(frm) {
+	if (!frm.is_new() || (frm.doc.preferred_slots || []).length) return;
+
+	for (let offset = 1; offset <= 7; offset++) {
+		frm.add_child("preferred_slots", {
+			// .slice(0, 10): frappe.datetime.add_days returns a full ISO
+			// datetime (moment's default format), not the plain YYYY-MM-DD
+			// a Date field expects -- the date is always the first 10 chars.
+			slot_date: frappe.datetime.add_days(frappe.datetime.get_today(), offset).slice(0, 10),
+			band_morning: 1,
+			band_afternoon: 1,
+			band_overnight: 1,
+		});
+	}
+	frm.refresh_field("preferred_slots");
 }
 
 function refresh_allowed_countries(frm) {

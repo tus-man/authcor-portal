@@ -10,17 +10,35 @@ from frappe.utils.password import update_password
 
 
 def _add_user(email, password, roles=None, username=None):
-	user = frappe.get_doc(
-		doctype="User",
-		email=email,
-		first_name=email.split("@", 1)[0],
-		username=username,
-		send_welcome_email=0,
-	).insert(ignore_permissions=True)
+	"""Get-or-create by email, tolerating a leftover row from an earlier
+	interrupted run on a reused dev site -- this class's own docstring
+	explains why one is possible here (a committed login breaks
+	IntegrationTestCase's normal rollback). Password and username are
+	reapplied either way so a stale leftover can't leave the wrong
+	credentials in place; roles are reconciled to exactly the requested
+	set, not just appended to, since a role this gate test didn't ask for
+	surviving from a previous run would silently change what's being
+	tested."""
+	if frappe.db.exists("User", email):
+		user = frappe.get_doc("User", email)
+		user.username = username
+	else:
+		user = frappe.get_doc(
+			doctype="User",
+			email=email,
+			first_name=email.split("@", 1)[0],
+			username=username,
+			send_welcome_email=0,
+		).insert(ignore_permissions=True)
+
 	user.new_password = password
 	user.save(ignore_permissions=True)
-	for role in roles or []:
-		user.add_roles(role)
+
+	existing_roles = {d.role for d in user.get("roles")}
+	wanted_roles = set(roles or [])
+	if stale := existing_roles - wanted_roles:
+		user.remove_roles(*stale)
+	user.add_roles(*wanted_roles)
 	return user
 
 

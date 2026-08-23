@@ -4,7 +4,6 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime
 
 from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request import (
 	UNRESTRICTED_TICKET_ROLES,
@@ -13,13 +12,13 @@ from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request impor
 
 APPROVAL_ROLES = {"Operations L1 Authorizer", "Admin L1", "Admin L2"}
 CLIENT_ROLES = {"Client L1 Authorizer", "Client L2 Authorizer"}
-CLIENT_VISIBLE_STATUSES = ("Approved", "Reimbursed")
+CLIENT_VISIBLE_STATUSES = ("Submitted", "Reimbursed")
 
 
-def _ensure_can_approve_expense():
+def _ensure_can_mark_reimbursed():
 	if not set(frappe.get_roles()) & APPROVAL_ROLES:
 		frappe.throw(
-			_("You are not permitted to approve or reject expense claims."), frappe.PermissionError
+			_("You are not permitted to mark expense claims as reimbursed."), frappe.PermissionError
 		)
 
 
@@ -39,9 +38,10 @@ def get_visibility_condition(user):
 	already handled by Frappe's standard User Permission enforcement on the
 	`customer` link field -- a Client L1/L2 user is bound to their own AC
 	Customer via a User Permission record, same as ticket visibility -- so
-	this hook only ever narrows client roles further, by status:
-	Draft/Submitted/Rejected are internal,
-	the customer sees Approved and Reimbursed only. Written once and used,
+	this hook only ever narrows client roles further, by status: Draft is
+	internal, the customer sees Submitted and Reimbursed (post-demo: approval
+	was removed, so Submitted is now the gate a claim becomes customer-visible
+	at). Written once and used,
 	verbatim, by both get_permission_query_conditions (list views/reports)
 	and has_permission (get_doc/API reads) so the two hooks can't drift
 	apart, same pattern as ticket visibility's get_visibility_condition.
@@ -145,49 +145,14 @@ def submit_claim(claim):
 
 
 @frappe.whitelist()
-def approve_claim(claim, note=None):
-	_ensure_can_approve_expense()
-	doc = frappe.get_doc("AC Expense Claim", claim)
-	if doc.status != "Submitted":
-		frappe.throw(_("Only a Submitted claim can be approved."))
-
-	doc.status = "Approved"
-	doc.approved_by = frappe.session.user
-	doc.approved_on = now_datetime()
-	doc.save(ignore_permissions=True)
-
-	recompute_time_expense_rollups(doc.ticket)
-	frappe.db.commit()
-	return doc
-
-
-@frappe.whitelist()
-def reject_claim(claim, reason=None):
-	"""Rejection requires a reason -- an engineer whose out-of-pocket claim
-	is refused needs to know why (section 3)."""
-	_ensure_can_approve_expense()
-	if not reason:
-		frappe.throw(_("A rejection reason is required."))
-
-	doc = frappe.get_doc("AC Expense Claim", claim)
-	if doc.status != "Submitted":
-		frappe.throw(_("Only a Submitted claim can be rejected."))
-
-	doc.status = "Rejected"
-	doc.approved_by = frappe.session.user
-	doc.approved_on = now_datetime()
-	doc.rejection_reason = reason
-	doc.save(ignore_permissions=True)
-	frappe.db.commit()
-	return doc
-
-
-@frappe.whitelist()
 def mark_reimbursed(claim):
-	_ensure_can_approve_expense()
+	"""Section 3, post-demo: approval is gone -- a claim reaches the
+	customer as soon as it's Submitted with a receipt, so this is the one
+	remaining decision, tracking that Authcor has actually paid it out."""
+	_ensure_can_mark_reimbursed()
 	doc = frappe.get_doc("AC Expense Claim", claim)
-	if doc.status != "Approved":
-		frappe.throw(_("Only an Approved claim can be marked Reimbursed."))
+	if doc.status != "Submitted":
+		frappe.throw(_("Only a Submitted claim can be marked Reimbursed."))
 
 	doc.status = "Reimbursed"
 	doc.save(ignore_permissions=True)

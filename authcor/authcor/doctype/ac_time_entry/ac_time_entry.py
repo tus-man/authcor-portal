@@ -10,6 +10,7 @@ from frappe.model.document import Document
 from frappe.utils import get_datetime, now_datetime
 
 from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request import (
+	SCOPED_TICKET_ROLES,
 	UNRESTRICTED_TICKET_ROLES,
 	WEEKDAY_NAMES,
 	_business_hours_by_day,
@@ -47,6 +48,77 @@ def derive_rate_category(city, start_time):
 	if start_of_day <= local_dt.time() < end_of_day:
 		return "Standard"
 	return "After Hours"
+
+
+def get_visibility_condition(user):
+	"""CHANGE-SET-POST-DEMO.md section 8/10.7. Authcor's narrowing: an
+	engineer sees their own time entries, plus entries on any ticket they
+	are themselves assigned to (the "shared ticket" clause -- a Support
+	engineer sees the Primary's hours on a job they're both on, and nothing
+	from a job they aren't), plus everything for an unrestricted role.
+	Written once and used, verbatim, by both get_permission_query_conditions
+	and has_permission, same pattern as ticket visibility
+	(ac_smart_hands_request.py) and expense claim visibility
+	(ac_expense_claim.py) -- so the two hooks can't drift apart.
+
+	engineer is a Link to AC Engineer Profile, whose autoname is
+	`field:user`, so it already *is* the owning engineer's user id and
+	compares directly against the caller with no extra lookup -- same
+	reasoning as this module's own validate_engineer_assignment.
+
+	Returns None for an unrestricted role, and also -- same shape as
+	ac_smart_hands_request.py's own get_visibility_condition -- for anyone
+	outside SCOPED_TICKET_ROLES (Operations L2/L3), the only roles this
+	own-entry/shared-ticket rule exists to narrow. That matters for a
+	client role specifically: a Client L1/L2 user is bound to their own AC
+	Customer via a User Permission record with apply_to_all_doctypes, which
+	Frappe checks automatically against AC Time Entry's own `customer`
+	field -- but only *after* this hook's has_permission side runs, and a
+	has_permission controller hook can only deny, never grant beyond what's
+	already there (frappe/permissions.py: has_controller_permissions,
+	"Controllers can only deny permission"). Returning a real own/
+	shared-ticket condition for a client here would hard-deny every time
+	entry before that User Permission check ever gets a chance to run, since
+	a client matches none of "own", "shared ticket", or "unrestricted
+	role" -- which is exactly the bug this fixes: a client must still see
+	their own customer's time entries, scoped by that existing User
+	Permission, not by a rule written for engineers."""
+	roles = set(frappe.get_roles(user))
+	if roles & UNRESTRICTED_TICKET_ROLES:
+		return None
+	if not (roles & SCOPED_TICKET_ROLES):
+		return None
+
+	user_escaped = frappe.db.escape(user)
+	return f"""(
+		`tabAC Time Entry`.engineer = {user_escaped}
+		or `tabAC Time Entry`.ticket in (
+			select te.parent from `tabAC Ticket Engineer` te where te.engineer = {user_escaped}
+		)
+	)"""
+
+
+def get_permission_query_conditions(user, doctype=None):
+	return get_visibility_condition(user) or ""
+
+
+def has_permission(doc, ptype=None, user=None, debug=False):
+	if not user:
+		user = frappe.session.user
+
+	if doc.is_new():
+		return True
+
+	condition = get_visibility_condition(user)
+	if condition is None:
+		return True
+
+	return bool(
+		frappe.db.sql(
+			f"select name from `tabAC Time Entry` where name = %s and {condition}",
+			(doc.name,),
+		)
+	)
 
 
 class ACTimeEntry(Document):

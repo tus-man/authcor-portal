@@ -5,9 +5,7 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, now_datetime
 
 from authcor.authcor.doctype.ac_expense_claim.ac_expense_claim import (
-	approve_claim,
 	mark_reimbursed,
-	reject_claim,
 	submit_claim,
 )
 from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request import add_engineer
@@ -29,67 +27,91 @@ MON_FRI_HOURS = [
 HOLIDAY_DATE = "2026-06-16"  # Tuesday -- inside business hours, but a holiday
 
 
+def _get_or_create(doctype, name, values):
+	"""Get-or-create by primary name, tolerating a leftover row from an
+	earlier interrupted run on a reused dev site -- CI always builds a
+	fresh site, so this never bites there. Same "get-or-mutate" shape as
+	sla_fixtures.ensure_sla_policy: an existing row is updated to match
+	`values` rather than trusted as-is."""
+	if frappe.db.exists(doctype, name):
+		doc = frappe.get_doc(doctype, name)
+		doc.update(values)
+		doc.save(ignore_permissions=True)
+		return doc
+	return frappe.get_doc(doctype=doctype, **values).insert(ignore_permissions=True)
+
+
 def _make_city(name, business_hours, holiday_calendar):
-	return frappe.get_doc(
-		doctype="AC City",
-		city_name=name,
-		country="Singapore",
-		timezone=SGT,
-		business_hours=business_hours,
-		holiday_calendar=holiday_calendar,
-	).insert(ignore_permissions=True)
-
-
-def _make_holiday_calendar(name, year, holiday_dates):
-	return frappe.get_doc(
-		doctype="AC Holiday Calendar",
-		calendar_name=name,
-		year=year,
-		holidays=[{"holiday_date": d} for d in holiday_dates],
-	).insert(ignore_permissions=True)
-
-
-def _make_data_center(name, city):
-	return frappe.get_doc(doctype="AC Data Center", data_center_name=name, city=city).insert(
-		ignore_permissions=True
+	return _get_or_create(
+		"AC City",
+		name,
+		{
+			"city_name": name,
+			"country": "Singapore",
+			"timezone": SGT,
+			"business_hours": business_hours,
+			"holiday_calendar": holiday_calendar,
+		},
 	)
 
 
-def _make_engineer(email):
-	user = frappe.get_doc(
+def _make_holiday_calendar(name, year, holiday_dates):
+	return _get_or_create(
+		"AC Holiday Calendar",
+		name,
+		{"calendar_name": name, "year": year, "holidays": [{"holiday_date": d} for d in holiday_dates]},
+	)
+
+
+def _make_data_center(name, city):
+	return _get_or_create("AC Data Center", name, {"data_center_name": name, "city": city})
+
+
+def _get_or_create_user(email):
+	if frappe.db.exists("User", email):
+		return frappe.get_doc("User", email)
+	return frappe.get_doc(
 		doctype="User", email=email, first_name=email.split("@", 1)[0], send_welcome_email=0
 	).insert(ignore_permissions=True)
+
+
+def _make_engineer(email):
+	user = _get_or_create_user(email)
 	user.add_roles("Operations L3 Authorizer")
-	profile = frappe.get_doc(
-		doctype="AC Engineer Profile",
-		user=user.name,
-		phone="+65 8000 0000",
-		id_type="NRIC",
-		id_number="S1234567A",
-		is_active=1,
-	).insert(ignore_permissions=True)
+	profile = _get_or_create(
+		"AC Engineer Profile",
+		user.name,
+		{
+			"user": user.name,
+			"phone": "+65 8000 0000",
+			"id_type": "NRIC",
+			"id_number": "S1234567A",
+			"is_active": 1,
+		},
+	)
 	return user, profile
 
 
 def _make_user(email, roles):
-	user = frappe.get_doc(
-		doctype="User", email=email, first_name=email.split("@", 1)[0], send_welcome_email=0
-	).insert(ignore_permissions=True)
+	user = _get_or_create_user(email)
 	for role in roles:
 		user.add_roles(role)
 	return user
 
 
 def _make_customer(name, authorised_engineers, portal_users=None):
-	return frappe.get_doc(
-		doctype="AC Customer",
-		customer_name=name,
-		service_level="Standard",
-		authorised_engineers=[{"engineer": u} for u in authorised_engineers],
-		portal_users=[
-			{"user": u, "authorizer_level": "L1 Authorizer", "is_active": 1} for u in (portal_users or [])
-		],
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC Customer",
+		name,
+		{
+			"customer_name": name,
+			"service_level": "Standard",
+			"authorised_engineers": [{"engineer": u} for u in authorised_engineers],
+			"portal_users": [
+				{"user": u, "authorizer_level": "L1 Authorizer", "is_active": 1} for u in (portal_users or [])
+			],
+		},
+	)
 
 
 def _grant_customer_access(user, customer):
@@ -117,9 +139,9 @@ def _make_ticket(customer, city, data_center, engineers_required=2):
 		data_center=data_center,
 		subject="Time/expense test ticket",
 		description="Test",
-		action_required="Remote Hands",
+		action_required="Smart Hands",
 		engineers_required=engineers_required,
-		status="In Pool",
+		status="Open",
 	).insert(ignore_permissions=True)
 
 
@@ -452,27 +474,23 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 		entry.cancel()
 		self.assertEqual(self._reload(ticket.name).total_hours, 0)
 
-	def test_rollup_counts_approved_expenses_only(self):
+	def test_rollup_counts_submitted_and_reimbursed_expenses_only(self):
 		ticket = self._new_ticket()
 		self._make_expense_claim(ticket.name, self.engineer_a.name, amount=10)  # stays Draft
 
 		submitted = self._make_expense_claim(ticket.name, self.engineer_a.name, amount=20)
 		submitted.status = "Submitted"
-		submitted.save(ignore_permissions=True)  # stays Submitted, never decided
+		submitted.save(ignore_permissions=True)  # stays Submitted, never reimbursed
 
-		to_approve = self._make_expense_claim(ticket.name, self.engineer_a.name, amount=30)
-		to_approve.status = "Submitted"
-		to_approve.save(ignore_permissions=True)
-		to_reject = self._make_expense_claim(ticket.name, self.engineer_a.name, amount=40)
-		to_reject.status = "Submitted"
-		to_reject.save(ignore_permissions=True)
+		to_reimburse = self._make_expense_claim(ticket.name, self.engineer_a.name, amount=30)
+		to_reimburse.status = "Submitted"
+		to_reimburse.save(ignore_permissions=True)
 
 		frappe.set_user(self.ops_l1_user.name)
-		approve_claim(to_approve.name)
-		reject_claim(to_reject.name, reason="Not a valid expense")
+		mark_reimbursed(to_reimburse.name)
 		frappe.set_user("Administrator")
 
-		self.assertEqual(self._reload(ticket.name).total_expenses, 30)
+		self.assertEqual(self._reload(ticket.name).total_expenses, 50)
 
 	# -- section 3: expense claims ----------------------------------------------
 
@@ -531,18 +549,7 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self._make_expense_claim(ticket.name, self.engineer_a.name, receipt=None)
 
-	def test_reject_without_reason_rejected(self):
-		ticket = self._new_ticket()
-		claim = self._make_expense_claim(ticket.name, self.engineer_a.name)
-		claim.status = "Submitted"
-		claim.save(ignore_permissions=True)
-
-		frappe.set_user(self.ops_l1_user.name)
-		with self.assertRaises(frappe.ValidationError):
-			reject_claim(claim.name)
-		frappe.set_user("Administrator")
-
-	def test_submit_approve_reimburse_flow(self):
+	def test_submit_and_reimburse_flow(self):
 		ticket = self._new_ticket()
 		claim = self._make_expense_claim(ticket.name, self.engineer_a.name, amount=75)
 
@@ -552,20 +559,24 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 		frappe.set_user("Administrator")
 
 		frappe.set_user(self.ops_l1_user.name)
-		approved = approve_claim(claim.name)
-		self.assertEqual(approved.status, "Approved")
-		self.assertEqual(approved.approved_by, self.ops_l1_user.name)
-		self.assertIsNotNone(approved.approved_on)
-
 		reimbursed = mark_reimbursed(claim.name)
 		self.assertEqual(reimbursed.status, "Reimbursed")
 		frappe.set_user("Administrator")
 
 		self.assertEqual(self._reload(ticket.name).total_expenses, 75)
 
-	# -- section 3: client visibility (Approved/Reimbursed only) ---------------
+	def test_reimbursing_a_draft_claim_is_rejected(self):
+		ticket = self._new_ticket()
+		claim = self._make_expense_claim(ticket.name, self.engineer_a.name)
 
-	def test_client_sees_approved_expense_but_not_draft_submitted_rejected(self):
+		frappe.set_user(self.ops_l1_user.name)
+		with self.assertRaises(frappe.ValidationError):
+			mark_reimbursed(claim.name)
+		frappe.set_user("Administrator")
+
+	# -- section 3: client visibility (Submitted/Reimbursed only) --------------
+
+	def test_client_sees_submitted_expense_but_not_draft(self):
 		ticket = self._new_ticket()
 		draft = self._make_expense_claim(ticket.name, self.engineer_a.name, amount=11)
 
@@ -573,32 +584,16 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 		submitted.status = "Submitted"
 		submitted.save(ignore_permissions=True)
 
-		rejected = self._make_expense_claim(ticket.name, self.engineer_a.name, amount=13)
-		rejected.status = "Submitted"
-		rejected.save(ignore_permissions=True)
-		frappe.set_user(self.ops_l1_user.name)
-		reject_claim(rejected.name, reason="Nope")
-		frappe.set_user("Administrator")
-
-		approved = self._make_expense_claim(ticket.name, self.engineer_a.name, amount=14)
-		approved.status = "Submitted"
-		approved.save(ignore_permissions=True)
-		frappe.set_user(self.ops_l1_user.name)
-		approve_claim(approved.name)
-		frappe.set_user("Administrator")
-
 		frappe.set_user(self.portal_user.name)
 		visible = {
 			row.name
 			for row in frappe.get_list("AC Expense Claim", fields=["name"], limit_page_length=0)
 		}
-		self.assertIn(approved.name, visible)
+		self.assertIn(submitted.name, visible)
 		self.assertNotIn(draft.name, visible)
-		self.assertNotIn(submitted.name, visible)
-		self.assertNotIn(rejected.name, visible)
 
 		self.assertTrue(
-			frappe.has_permission("AC Expense Claim", doc=approved.name, user=self.portal_user.name)
+			frappe.has_permission("AC Expense Claim", doc=submitted.name, user=self.portal_user.name)
 		)
 		self.assertFalse(
 			frappe.has_permission("AC Expense Claim", doc=draft.name, user=self.portal_user.name)
@@ -623,6 +618,99 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 		self.assertIsNone(doc.get("rate_category"))
 		self.assertEqual(doc.get("engineer"), self.engineer_a.name)
 
+	# -- CHANGE-SET-POST-DEMO.md section 2/10: SLA fields moved to permlevel 1,
+	# work-summary rollups stay at permlevel 0 -----------------------------
+
+	def test_client_role_cannot_see_response_due_or_response_sla_verdict(self):
+		ticket = self._new_ticket()
+
+		frappe.set_user(self.portal_user.name)
+		doc = frappe.get_doc("AC Smart Hands Request", ticket.name)
+		doc.check_permission("read")
+		doc.apply_fieldlevel_read_permissions()
+		frappe.set_user("Administrator")
+
+		self.assertIsNone(doc.get("response_due"))
+		self.assertIsNone(doc.get("has_met_response_sla"))
+
+	def test_client_role_can_still_see_total_hours_and_total_expenses(self):
+		ticket = self._new_ticket()
+
+		frappe.set_user(self.portal_user.name)
+		doc = frappe.get_doc("AC Smart Hands Request", ticket.name)
+		doc.check_permission("read")
+		doc.apply_fieldlevel_read_permissions()
+		frappe.set_user("Administrator")
+
+		self.assertIsNotNone(doc.get("total_hours"))
+		self.assertIsNotNone(doc.get("total_expenses"))
+
+	# -- CHANGE-SET-POST-DEMO.md section 1/10.3-4: Closed/Completed gates ------
+
+	def test_completing_without_proof_of_work_is_rejected(self):
+		ticket = self._new_ticket()
+		ticket.status = "Completed"
+		with self.assertRaises(frappe.ValidationError):
+			ticket.save(ignore_permissions=True)
+
+	def test_closing_without_a_submitted_time_entry_is_rejected(self):
+		ticket = self._new_ticket()
+		ticket.append("proof_of_work", {"image": "/files/proof.jpg", "image_type": "After"})
+		ticket.status = "Closed"
+		with self.assertRaises(frappe.ValidationError):
+			ticket.save(ignore_permissions=True)
+
+	def test_closing_with_only_a_draft_time_entry_is_rejected(self):
+		ticket = self._new_ticket()
+		self._make_time_entry(ticket.name, self.engineer_a.name, "2026-06-15 06:00:00", "2026-06-15 07:00:00")
+
+		ticket = self._reload(ticket.name)
+		ticket.append("proof_of_work", {"image": "/files/proof.jpg", "image_type": "After"})
+		ticket.status = "Closed"
+		with self.assertRaises(frappe.ValidationError):
+			ticket.save(ignore_permissions=True)
+
+	def test_closing_with_a_submitted_entry_and_proof_succeeds(self):
+		ticket = self._new_ticket()
+		entry = self._make_time_entry(
+			ticket.name, self.engineer_a.name, "2026-06-15 06:00:00", "2026-06-15 07:00:00"
+		)
+		entry.submit()
+
+		ticket = self._reload(ticket.name)
+		ticket.append("proof_of_work", {"image": "/files/proof.jpg", "image_type": "After"})
+		ticket.status = "Closed"
+		ticket.save(ignore_permissions=True)
+
+		self.assertEqual(self._reload(ticket.name).status, "Closed")
+
+	def test_closing_a_completed_ticket_preserves_completion_stamp(self):
+		# Closed is a forward transition from Completed, not a reopening --
+		# stamp_completion must not clear completed_on/completed_by the way
+		# it does for a genuine reopen (test_reopening_clears_completion_
+		# fields in test_smart_hands_request.py), since Closed's own gate
+		# (submitted time entry + proof) is what the closure email in
+		# section 6 depends on knowing actually finished, and when.
+		ticket = self._new_ticket()
+		entry = self._make_time_entry(
+			ticket.name, self.engineer_a.name, "2026-06-15 06:00:00", "2026-06-15 07:00:00"
+		)
+		entry.submit()
+
+		ticket = self._reload(ticket.name)
+		ticket.append("proof_of_work", {"image": "/files/proof.jpg", "image_type": "After"})
+		ticket.status = "Completed"
+		ticket.save(ignore_permissions=True)
+		completed_on = ticket.completed_on
+		self.assertIsNotNone(completed_on)
+
+		ticket.status = "Closed"
+		ticket.save(ignore_permissions=True)
+
+		reloaded = self._reload(ticket.name)
+		self.assertEqual(reloaded.status, "Closed")
+		self.assertEqual(reloaded.completed_on, completed_on)
+
 	# -- section 5: unlogged hours nudge ----------------------------------------
 
 	def test_unlogged_hours_nudge_emails_only_engineers_without_a_logged_entry(self):
@@ -644,3 +732,175 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 		recipients = [call.kwargs["recipients"][0] for call in mock_sendmail.call_args_list]
 		self.assertIn(self.engineer_a.name, recipients)
 		self.assertNotIn(self.engineer_b.name, recipients)
+
+
+class TestTimeEntryVisibility(IntegrationTestCase):
+	"""CHANGE-SET-POST-DEMO.md section 8/10.7: an engineer sees their own
+	time entries, plus entries on any ticket they are themselves assigned
+	to, plus everything for an unrestricted role -- narrower than the old
+	"any engineer who can see the ticket sees every entry on it." Same
+	permission_query_conditions + has_permission pairing as ticket
+	visibility (test_ticket_visibility.py) and expense claim visibility, so
+	both the get_list path and the has_permission path are proven
+	independently, for both the "shared ticket" grant and the "no shared
+	ticket" denial. Also covers the client-role regression this predicate
+	almost introduced: a Client L1/L2 user matches none of "own entry",
+	"shared ticket", or "unrestricted role", so the predicate must return
+	None for them rather than a real condition -- otherwise has_permission
+	(a controller hook, which can only deny, never grant beyond what's
+	already there) would hard-deny every time entry before Frappe's own
+	User Permission check on the `customer` field ever got a chance to
+	scope them to their own customer's rows.
+
+	Ticket assignment is done by appending directly to assigned_engineers
+	and saving, not via add_engineer() -- that whitelisted method forces a
+	commit (PHASE-2B-CLAIM.md section 3 step 10), which would break this
+	class's reliance on IntegrationTestCase's normal per-test rollback for
+	cleanup. Same reasoning as test_ticket_visibility.py's
+	assigned_but_unauthorised_ticket fixture."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		ensure_sla_policy_committed(
+			cls.addClassCleanup,
+			"Standard",
+			"P4",
+			response_minutes=480,
+			onsite_minutes=0,
+			onsite_next_business_day=0,
+			business_hours_only=0,
+			response_next_business_day=0,
+		)
+
+		cls.calendar = _make_holiday_calendar("Test TEV Holiday Calendar 2026", 2026, [])
+		cls.city = _make_city("Test TEV City", MON_FRI_HOURS, cls.calendar.name)
+		cls.dc = _make_data_center("Test TEV DC", cls.city.name)
+
+		cls.primary, cls.primary_profile = _make_engineer("tev_primary@authcor.test")
+		cls.support, cls.support_profile = _make_engineer("tev_support@authcor.test")
+		cls.stranger, cls.stranger_profile = _make_engineer("tev_stranger@authcor.test")
+		cls.ops_l1_user = _make_user("tev_ops_l1@authcor.test", roles=["Operations L1 Authorizer"])
+
+		cls.customer = _make_customer(
+			"Test TEV Customer",
+			authorised_engineers=[cls.primary.name, cls.support.name, cls.stranger.name],
+		)
+
+		cls.shared_ticket = _make_ticket(cls.customer.name, cls.city.name, cls.dc.name, engineers_required=2)
+		cls.shared_ticket.append(
+			"assigned_engineers",
+			{"engineer": cls.primary.name, "assignment_type": "Primary", "added_by": "Administrator"},
+		)
+		cls.shared_ticket.append(
+			"assigned_engineers",
+			{"engineer": cls.support.name, "assignment_type": "Support", "added_by": "Administrator"},
+		)
+		cls.shared_ticket.save(ignore_permissions=True)
+
+		cls.other_ticket = _make_ticket(cls.customer.name, cls.city.name, cls.dc.name, engineers_required=1)
+		cls.other_ticket.append(
+			"assigned_engineers",
+			{"engineer": cls.stranger.name, "assignment_type": "Primary", "added_by": "Administrator"},
+		)
+		cls.other_ticket.save(ignore_permissions=True)
+
+		cls.primary_entry = frappe.get_doc(
+			doctype="AC Time Entry",
+			ticket=cls.shared_ticket.name,
+			engineer=cls.primary.name,
+			work_date="2026-06-15",
+			start_time="2026-06-15 06:00:00",
+			end_time="2026-06-15 07:00:00",
+		).insert(ignore_permissions=True)
+
+		cls.stranger_entry = frappe.get_doc(
+			doctype="AC Time Entry",
+			ticket=cls.other_ticket.name,
+			engineer=cls.stranger.name,
+			work_date="2026-06-15",
+			start_time="2026-06-15 06:00:00",
+			end_time="2026-06-15 07:00:00",
+		).insert(ignore_permissions=True)
+
+		# A second customer entirely, to prove the client-role fix scopes by
+		# the caller's own customer rather than granting blanket access.
+		cls.client_user = _make_user("tev_client@authcor.test", roles=["Client L1 Authorizer"])
+		_grant_customer_access(cls.client_user.name, cls.customer.name)
+
+		cls.other_customer = _make_customer(
+			"Test TEV Other Customer", authorised_engineers=[cls.stranger.name]
+		)
+		cls.other_customer_ticket = _make_ticket(
+			cls.other_customer.name, cls.city.name, cls.dc.name, engineers_required=1
+		)
+		cls.other_customer_ticket.append(
+			"assigned_engineers",
+			{"engineer": cls.stranger.name, "assignment_type": "Primary", "added_by": "Administrator"},
+		)
+		cls.other_customer_ticket.save(ignore_permissions=True)
+
+		cls.other_customer_entry = frappe.get_doc(
+			doctype="AC Time Entry",
+			ticket=cls.other_customer_ticket.name,
+			engineer=cls.stranger.name,
+			work_date="2026-06-15",
+			start_time="2026-06-15 06:00:00",
+			end_time="2026-06-15 07:00:00",
+		).insert(ignore_permissions=True)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		super().tearDown()
+
+	def _visible_names(self, user):
+		frappe.set_user(user)
+		return {row.name for row in frappe.get_list("AC Time Entry", fields=["name"], limit_page_length=0)}
+
+	def test_engineer_always_sees_own_entries(self):
+		self.assertIn(self.primary_entry.name, self._visible_names(self.primary.name))
+
+	def test_engineer_sees_colleague_entry_on_shared_ticket(self):
+		self.assertIn(self.primary_entry.name, self._visible_names(self.support.name))
+
+	def test_engineer_does_not_see_entry_on_ticket_they_are_not_assigned_to(self):
+		self.assertNotIn(self.stranger_entry.name, self._visible_names(self.primary.name))
+
+	def test_engineer_denied_direct_read_on_entry_from_unassigned_ticket(self):
+		self.assertFalse(
+			frappe.has_permission("AC Time Entry", doc=self.stranger_entry.name, user=self.primary.name)
+		)
+
+	def test_engineer_has_direct_read_on_shared_ticket_colleague_entry(self):
+		self.assertTrue(
+			frappe.has_permission("AC Time Entry", doc=self.primary_entry.name, user=self.support.name)
+		)
+
+	def test_ops_l1_sees_all_entries(self):
+		names = self._visible_names(self.ops_l1_user.name)
+		self.assertIn(self.primary_entry.name, names)
+		self.assertIn(self.stranger_entry.name, names)
+
+	# -- client role: scoped by the existing User Permission on AC Customer,
+	# not by the engineer-only own/shared-ticket rule above -----------------
+
+	def test_client_sees_entries_for_own_customer(self):
+		names = self._visible_names(self.client_user.name)
+		self.assertIn(self.primary_entry.name, names)
+		self.assertIn(self.stranger_entry.name, names)
+
+	def test_client_does_not_see_entries_for_another_customer_via_list(self):
+		names = self._visible_names(self.client_user.name)
+		self.assertNotIn(self.other_customer_entry.name, names)
+
+	def test_client_has_direct_read_on_own_customer_entry(self):
+		self.assertTrue(
+			frappe.has_permission("AC Time Entry", doc=self.primary_entry.name, user=self.client_user.name)
+		)
+
+	def test_client_denied_direct_read_on_another_customers_entry(self):
+		self.assertFalse(
+			frappe.has_permission(
+				"AC Time Entry", doc=self.other_customer_entry.name, user=self.client_user.name
+			)
+		)

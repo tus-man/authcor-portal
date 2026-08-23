@@ -21,53 +21,74 @@ from authcor.tests.sla_fixtures import ensure_sla_policy, ensure_sla_policy_comm
 SGT = "Asia/Singapore"
 
 
+def _get_or_create(doctype, name, values):
+	"""Get-or-create by primary name, tolerating a leftover row from an
+	earlier interrupted run on a reused dev site -- CI always builds a
+	fresh site, so this never bites there, but a dev site that survives
+	across runs can hold a row this exact fixture created and never got to
+	clean up (e.g. a killed process, or a run interrupted mid-class before
+	its own cleanup ran). Same "get-or-mutate" shape as
+	sla_fixtures.ensure_sla_policy: an existing row is updated to match
+	`values` rather than trusted as-is, since a test that depends on a
+	specific field value (an expired FIN, a specific business-hours row)
+	must not silently get a stale leftover instead."""
+	if frappe.db.exists(doctype, name):
+		doc = frappe.get_doc(doctype, name)
+		doc.update(values)
+		doc.save(ignore_permissions=True)
+		return doc
+	return frappe.get_doc(doctype=doctype, **values).insert(ignore_permissions=True)
+
+
 def _make_city(city_name, country, timezone):
-	return frappe.get_doc(
-		doctype="AC City",
-		city_name=city_name,
-		country=country,
-		timezone=timezone,
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC City", city_name, {"city_name": city_name, "country": country, "timezone": timezone}
+	)
 
 
 def _make_business_city(city_name, country, timezone, business_hours=None, holiday_calendar=None):
-	return frappe.get_doc(
-		doctype="AC City",
-		city_name=city_name,
-		country=country,
-		timezone=timezone,
-		business_hours=business_hours or [],
-		holiday_calendar=holiday_calendar,
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC City",
+		city_name,
+		{
+			"city_name": city_name,
+			"country": country,
+			"timezone": timezone,
+			"business_hours": business_hours or [],
+			"holiday_calendar": holiday_calendar,
+		},
+	)
 
 
 def _make_holiday_calendar(calendar_name, year, holiday_dates):
-	return frappe.get_doc(
-		doctype="AC Holiday Calendar",
-		calendar_name=calendar_name,
-		year=year,
-		holidays=[{"holiday_date": d} for d in holiday_dates],
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC Holiday Calendar",
+		calendar_name,
+		{
+			"calendar_name": calendar_name,
+			"year": year,
+			"holidays": [{"holiday_date": d} for d in holiday_dates],
+		},
+	)
 
 
 def _make_data_center(data_center_name, city):
-	return frappe.get_doc(
-		doctype="AC Data Center",
-		data_center_name=data_center_name,
-		city=city,
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC Data Center", data_center_name, {"data_center_name": data_center_name, "city": city}
+	)
 
 
 def _make_customer(customer_name, service_areas, service_level="Standard"):
-	return frappe.get_doc(
-		doctype="AC Customer",
-		customer_name=customer_name,
-		service_level=service_level,
-		service_areas=service_areas,
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC Customer",
+		customer_name,
+		{"customer_name": customer_name, "service_level": service_level, "service_areas": service_areas},
+	)
 
 
 def _make_plain_user(email):
+	if frappe.db.exists("User", email):
+		return frappe.get_doc("User", email)
 	return frappe.get_doc(
 		doctype="User",
 		email=email,
@@ -421,13 +442,16 @@ class TestSmartHandsRequestController(IntegrationTestCase):
 			service_areas=[{"country": "Singapore", "city": cls.city.name, "data_center": cls.data_center.name}],
 		)
 		cls.engineer_user = _make_plain_user("shr_engineer@authcor.test")
-		cls.engineer_profile = frappe.get_doc(
-			doctype="AC Engineer Profile",
-			user=cls.engineer_user.name,
-			phone="+65 8000 0000",
-			id_type="NRIC",
-			id_number="S1234567A",
-		).insert(ignore_permissions=True)
+		cls.engineer_profile = _get_or_create(
+			"AC Engineer Profile",
+			cls.engineer_user.name,
+			{
+				"user": cls.engineer_user.name,
+				"phone": "+65 8000 0000",
+				"id_type": "NRIC",
+				"id_number": "S1234567A",
+			},
+		)
 		cls.non_engineer_user = _make_plain_user("shr_non_engineer@authcor.test")
 
 	def _make_ticket(self, **overrides):
@@ -439,7 +463,7 @@ class TestSmartHandsRequestController(IntegrationTestCase):
 			"data_center": self.data_center.name,
 			"subject": "Test ticket",
 			"description": "Test description",
-			"action_required": "Remote Hands",
+			"action_required": "Smart Hands",
 		}
 		values.update(overrides)
 		return frappe.get_doc(values).insert(ignore_permissions=True)
@@ -481,7 +505,7 @@ class TestSmartHandsRequestController(IntegrationTestCase):
 		self.assertEqual(ticket.action_other_details, "Custom work")
 
 	def test_non_others_action_does_not_require_details(self):
-		ticket = self._make_ticket(action_required="Remote Hands")
+		ticket = self._make_ticket(action_required="Smart Hands")
 		self.assertFalse(ticket.action_other_details)
 
 	# -- (c) confirmed slot validation + UTC conversion -------------------
@@ -541,6 +565,7 @@ class TestSmartHandsRequestController(IntegrationTestCase):
 
 	def test_completing_stamps_completed_on_and_engineer_profile(self):
 		ticket = self._make_ticket()
+		ticket.append("proof_of_work", {"image": "/files/proof.jpg", "image_type": "After"})
 		frappe.set_user(self.engineer_user.name)
 		try:
 			ticket.status = "Completed"
@@ -553,6 +578,7 @@ class TestSmartHandsRequestController(IntegrationTestCase):
 
 	def test_completing_leaves_completed_by_blank_without_engineer_profile(self):
 		ticket = self._make_ticket()
+		ticket.append("proof_of_work", {"image": "/files/proof.jpg", "image_type": "After"})
 		frappe.set_user(self.non_engineer_user.name)
 		try:
 			ticket.status = "Completed"
@@ -565,6 +591,7 @@ class TestSmartHandsRequestController(IntegrationTestCase):
 
 	def test_reopening_clears_completion_fields(self):
 		ticket = self._make_ticket()
+		ticket.append("proof_of_work", {"image": "/files/proof.jpg", "image_type": "After"})
 		ticket.status = "Completed"
 		ticket.save(ignore_permissions=True)
 		self.assertIsNotNone(ticket.completed_on)
@@ -577,6 +604,7 @@ class TestSmartHandsRequestController(IntegrationTestCase):
 
 	def test_reediting_completed_ticket_does_not_overwrite_timestamp(self):
 		ticket = self._make_ticket()
+		ticket.append("proof_of_work", {"image": "/files/proof.jpg", "image_type": "After"})
 		ticket.status = "Completed"
 		ticket.save(ignore_permissions=True)
 		original_completed_on = ticket.completed_on
@@ -688,7 +716,7 @@ class TestSlaPolicyResolution(IntegrationTestCase):
 			"data_center": self.dc.name,
 			"subject": "SLA resolution test ticket",
 			"description": "Test",
-			"action_required": "Remote Hands",
+			"action_required": "Smart Hands",
 			"severity": severity,
 		}
 		values.update(overrides)
@@ -848,7 +876,7 @@ class TestSeverityEscalation(IntegrationTestCase):
 			"data_center": self.dc.name,
 			"subject": "Escalation test ticket",
 			"description": "Test",
-			"action_required": "Remote Hands",
+			"action_required": "Smart Hands",
 			"severity": severity,
 		}
 		values.update(overrides)
@@ -958,7 +986,7 @@ class TestOnsiteArrival(IntegrationTestCase):
 			"data_center": self.dc.name,
 			"subject": "Onsite arrival test ticket",
 			"description": "Test",
-			"action_required": "Remote Hands",
+			"action_required": "Smart Hands",
 			"severity": severity,
 		}
 		values.update(overrides)
@@ -1048,7 +1076,7 @@ class TestSlaBreachDetection(IntegrationTestCase):
 			"data_center": self.dc.name,
 			"subject": "Breach detection test ticket",
 			"description": "Test",
-			"action_required": "Remote Hands",
+			"action_required": "Smart Hands",
 			"severity": "P1",
 		}
 		values.update(overrides)

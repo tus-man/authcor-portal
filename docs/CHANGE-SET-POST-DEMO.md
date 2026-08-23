@@ -80,17 +80,16 @@ Then grant permlevel 1 read on `AC Smart Hands Request` to Operations L1/L2/L3 a
 
 ---
 
-## 3. Action Required — reduced to three
+## 3. Action Required — reduced to two
 
 ```
 Smart Hands
-Shipment and Storage
 Others
 ```
 
-Our eight-option list was invented; this is Authcor's actual taxonomy. `action_other_details` keeps its existing conditional-required behaviour on `Others`.
+Authcor initially gave three, including "Shipment and Storage". That option is **removed**: shipments have their own DocType (`docs/PHASE-6-SHIPMENT.md`), because they need no engineers, no claiming, no preferred slots and no SLA. Leaving the action in place would let someone raise a smart hands ticket for work that belongs on the shipment form.
 
-**Worth raising with Authcor:** "Shipment and Storage" as a ticket action overlaps with the separate Shipment Request form in Phase 6. Is a shipment ticket a smart-hands ticket with this action set, or a Shipment Request record, or does one create the other? The requirements describe cross-linking between two forms, which suggests they're distinct — but this option muddies that. Clarify before building Phase 6.
+`action_other_details` keeps its existing conditional-required behaviour on `Others`.
 
 Existing dev tickets carry retired values; update or delete them.
 
@@ -170,19 +169,35 @@ Struck from the list in `PHASE-4-TIME-EXPENSE.md` §8 and the walkthrough's Part
 |---|---|
 | What marks arrival on site? | Transition to `In Progress` — our assumption confirmed |
 | Ticket statuses | `Open` replaces `In Pool`; `Closed` added |
-| Action Required options | Three, as above |
+| Action Required options | `Smart Hands` and `Others` — shipments have their own form |
 | Expense approval | Not wanted — removed |
 | NRIC disclosure channel | Portal view, in v1 |
 | L1 user management | Confirmed, deferred to portal |
+| Expense categories | Our list accepted as built |
+| Holiday calendars | Authcor will enter them manually — the v2 auto-fetch idea stands but isn't needed |
+| Business hours | Vary **by city**, as built |
+| Shipments | Separate DocType — see `docs/PHASE-6-SHIPMENT.md` |
+
+### Engineer visibility of time entries — narrowed
+
+Authcor's answer changes what was built: **engineers see other engineers' time entries only on tickets they share.** On any other ticket they see only their own.
+
+This is narrower than the current behaviour, where any engineer with read access sees all entries on tickets they can see.
+
+Implementation is the same two-mechanism pattern used for ticket visibility — a `permission_query_conditions` hook plus a matching `has_permission` check on `AC Time Entry`, sharing one predicate:
+
+> Show a time entry if the caller holds an unrestricted role (Ops L1, Admin L1/L2/L3), **or** the entry is the caller's own, **or** the caller is assigned to the same ticket as the entry.
+
+The third clause is what implements "shared ticket". A Support engineer sees the Primary's hours on a job they're both on, and nothing from a job they aren't.
+
+Expense claims stay private per engineer regardless of shared tickets — Only If Creator on Ops L2/L3, as already built. Financial information doesn't follow the same rule as operational visibility.
 
 **Still open:**
 
-- Expense categories — our list is still a guess
-- Whether engineers should see each other's time entries — currently yes
-- Which countries need holiday calendars
-- Whether business hours vary by city or only by country
-- Role naming (L1/L2/L3 inversion between Client and Operations)
-- Whether "Shipment and Storage" as an action overlaps the Shipment Request form (§3)
+- **Role naming** — Authcor is reviewing the L1/L2/L3 inversion between Client and Operations. No change until they come back. Worth not building anything that hardcodes those labels in user-facing text.
+- Receipt photograph mandatory on shipment receipt (see `PHASE-6-SHIPMENT.md` §9)
+- Outbound shipments — confirmed out of scope, or simply unmentioned?
+- Carrier list for shipments
 
 ---
 
@@ -208,7 +223,8 @@ Then commit the schema on its own before the code changes.
 4. Confirm the existing proof-of-work gate on `Completed` still holds
 5. Expense claim: remove `approve_claim` / `reject_claim` and their buttons; visibility hook changes to `Submitted`/`Reimbursed`
 6. Client script: populate `preferred_slots` on new-form load; keep `before_insert` as an API fallback guarded on the table being empty
-7. Update the dev data with the SQL in §1
+7. **Time entry visibility**: add `permission_query_conditions` and `has_permission` hooks on `AC Time Entry` per §8 — own entries, plus entries on tickets the caller is assigned to, plus everything for unrestricted roles. One shared predicate, both hooks.
+8. Update the dev data with the SQL in §1
 
 ### Tests to add
 
@@ -219,5 +235,9 @@ Then commit the schema on its own before the code changes.
 - A client role sees an expense claim at `Submitted` (previously `Approved`)
 - A client role does **not** see `response_due` or `has_met_response_sla` — the new permlevel boundary
 - A client role **does** still see `total_hours` and `total_expenses`
+- An engineer sees another engineer's time entry on a **shared** ticket
+- An engineer does **not** see another engineer's time entry on a ticket they aren't assigned to — by list **and** by direct access
+- An engineer always sees their own entries
+- Ops L1 sees all entries
 
-Those last two are the pair that matters. They're the boundary Authcor just asked for, and getting one right while getting the other wrong is the easy failure.
+Two pairs matter most. The `response_due` / `total_hours` pair is the permlevel boundary Authcor just asked for, and getting one right while getting the other wrong is the easy failure. The shared-ticket pair is the new visibility rule, and as always the direct-access case is the one that slips through.

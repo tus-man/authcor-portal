@@ -1,0 +1,259 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-08-23 19:01:22.564578",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "customer_and_destination_section",
+  "customer",
+  "country",
+  "city",
+  "data_center",
+  "column_break_zlpw",
+  "naming_series",
+  "related_ticket",
+  "shipment_details_section",
+  "subject",
+  "tracking_number",
+  "expected_delivery",
+  "column_break_kvjo",
+  "carrier",
+  "carrier_other",
+  "is_rma",
+  "section_break_nfqo",
+  "package_description",
+  "package_count",
+  "external_reference",
+  "notes",
+  "attachments",
+  "storage_section",
+  "store_in_warehouse",
+  "storage_location",
+  "stored_on",
+  "receipt_and_status_section",
+  "status",
+  "receipt_prrof",
+  "column_break_evdc",
+  "actual_delivery",
+  "received_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "customer_and_destination_section",
+   "fieldtype": "Section Break",
+   "label": "Customer and Destination"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Customer",
+   "options": "AC Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Country",
+   "options": "Country",
+   "reqd": 1
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "City",
+   "options": "AC City",
+   "reqd": 1
+  },
+  {
+   "fieldname": "data_center",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Data Center",
+   "options": "AC Data Center",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_zlpw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "AC-SHP-.YYYY.-.#####"
+  },
+  {
+   "fieldname": "related_ticket",
+   "fieldtype": "Link",
+   "label": "Related Smart Hands Ticket",
+   "options": "AC Smart Hands Request"
+  },
+  {
+   "fieldname": "shipment_details_section",
+   "fieldtype": "Section Break",
+   "label": "Shipment Details"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tracking_number",
+   "fieldtype": "Data",
+   "label": "Tracking Number"
+  },
+  {
+   "fieldname": "expected_delivery",
+   "fieldtype": "Date",
+   "label": "Expected Delivery",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_kvjo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "carrier",
+   "fieldtype": "Select",
+   "label": "Carrier",
+   "options": "DHL\nFedEx\nUPS\nTNT\nOthers",
+   "reqd": 1
+  },
+  {
+   "fieldname": "carrier_other",
+   "fieldtype": "Data",
+   "label": "Carrier Name"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_rma",
+   "fieldtype": "Check",
+   "label": "RMA"
+  },
+  {
+   "fieldname": "section_break_nfqo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "package_description",
+   "fieldtype": "Small Text",
+   "label": "Package Contents",
+   "reqd": 1
+  },
+  {
+   "fieldname": "package_count",
+   "fieldtype": "Int",
+   "label": "Number of Packages",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "external_reference",
+   "fieldtype": "Data",
+   "label": "Customer Reference"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text Editor",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "attachments",
+   "fieldtype": "Attach",
+   "label": "Attachments"
+  },
+  {
+   "fieldname": "storage_section",
+   "fieldtype": "Section Break",
+   "label": "Storage"
+  },
+  {
+   "default": "0",
+   "fieldname": "store_in_warehouse",
+   "fieldtype": "Check",
+   "label": "Store in Warehouse"
+  },
+  {
+   "depends_on": "eval:doc.store_in_warehouse",
+   "fieldname": "storage_location",
+   "fieldtype": "Data",
+   "label": "Storage Location"
+  },
+  {
+   "depends_on": "eval:doc.store_in_warehouse",
+   "fieldname": "stored_on",
+   "fieldtype": "Datetime",
+   "label": "Stored On"
+  },
+  {
+   "fieldname": "receipt_and_status_section",
+   "fieldtype": "Section Break",
+   "label": "Receipt and Status"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nReceived\nClosed\nCancelled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "receipt_prrof",
+   "fieldtype": "Table",
+   "label": "Receipt Proof",
+   "options": "AC Proof Image"
+  },
+  {
+   "fieldname": "column_break_evdc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "actual_delivery",
+   "fieldtype": "Datetime",
+   "label": "Actual Delivery",
+   "read_only": 1
+  },
+  {
+   "fieldname": "received_by",
+   "fieldtype": "Link",
+   "label": "Received By",
+   "options": "AC Engineer Profile"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-23 19:18:19.797281",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC Shipment Request",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

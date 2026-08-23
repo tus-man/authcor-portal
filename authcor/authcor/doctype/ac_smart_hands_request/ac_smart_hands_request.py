@@ -537,7 +537,7 @@ def remove_engineer(ticket, engineer):
 	engineers remain, promote the earliest-claimed Support -- otherwise a
 	ticket can end up with only Support engineers and no owner. Status is
 	only recomputed while the ticket is still in the pool lifecycle
-	(In Pool/Partially Claimed/Claimed); a Scheduled-or-later ticket's
+	(Open/Partially Claimed/Claimed); a Scheduled-or-later ticket's
 	status is left untouched, since removal rules past that point aren't
 	specified here. The disclosure log is never touched -- the disclosure
 	already happened and the record of it stands."""
@@ -563,9 +563,9 @@ def remove_engineer(ticket, engineer):
 			if remaining_support:
 				remaining_support[0].assignment_type = "Primary"
 
-		if doc.status in ("In Pool", "Partially Claimed", "Claimed"):
+		if doc.status in ("Open", "Partially Claimed", "Claimed"):
 			if not doc.assigned_engineers:
-				doc.status = "In Pool"
+				doc.status = "Open"
 			elif len(doc.assigned_engineers) >= doc.engineers_required:
 				doc.status = "Claimed"
 			else:
@@ -578,7 +578,7 @@ def remove_engineer(ticket, engineer):
 	return _run_with_lock_retry(_attempt)
 
 
-COUNT_CHANGE_BLOCKED_STATUSES = {"In Progress", "Completed", "Cancelled"}
+COUNT_CHANGE_BLOCKED_STATUSES = {"In Progress", "Completed", "Closed", "Cancelled"}
 
 
 def _recompute_pool_status(doc):
@@ -588,10 +588,10 @@ def _recompute_pool_status(doc):
 	and approve_count_request, both of which change engineers_required or
 	assigned_engineers outside the claim/remove paths that already carry
 	their own recompute."""
-	if doc.status not in ("In Pool", "Partially Claimed", "Claimed"):
+	if doc.status not in ("Open", "Partially Claimed", "Claimed"):
 		return
 	if not doc.assigned_engineers:
-		doc.status = "In Pool"
+		doc.status = "Open"
 	elif len(doc.assigned_engineers) >= doc.engineers_required:
 		doc.status = "Claimed"
 	else:
@@ -639,19 +639,21 @@ def increase_engineer_count(ticket, new_count):
 def recompute_time_expense_rollups(ticket_name):
 	"""PHASE-4-TIME-EXPENSE.md section 4. Full recompute from source rows
 	rather than incremental, so total_hours/total_expenses can never drift
-	from what a submitted AC Time Entry / Approved-or-Reimbursed AC Expense
+	from what a submitted AC Time Entry / Submitted-or-Reimbursed AC Expense
 	Claim actually shows -- called on time entry submit/cancel and on
-	expense claim approval/reimbursement. Uses frappe.db.set_value's
-	bulk-filter form deliberately, same reasoning as check_sla_breaches: this
-	is a derived total, not a business rule to re-run through the ticket's
-	own validate()."""
+	expense claim submission/reimbursement (post-demo: approval was
+	removed, so Submitted is now the gate a claim counts against, same as
+	it's the gate that makes a claim customer-visible). Uses
+	frappe.db.set_value's bulk-filter form deliberately, same reasoning as
+	check_sla_breaches: this is a derived total, not a business rule to
+	re-run through the ticket's own validate()."""
 	total_minutes = frappe.db.sql(
 		"select coalesce(sum(duration_minutes), 0) from `tabAC Time Entry` where ticket = %s and docstatus = 1",
 		(ticket_name,),
 	)[0][0]
 	total_expenses = frappe.db.sql(
 		"""select coalesce(sum(amount), 0) from `tabAC Expense Claim`
-		where ticket = %s and status in ('Approved', 'Reimbursed')""",
+		where ticket = %s and status in ('Submitted', 'Reimbursed')""",
 		(ticket_name,),
 	)[0][0]
 
@@ -745,6 +747,8 @@ class ACSmartHandsRequest(Document):
 		self.validate_engineers_required()
 		self.validate_action_other_details()
 		self.validate_confirmed_slot()
+		self.validate_completion_requirements()
+		self.validate_closure_requirements()
 		self.stamp_completion()
 		# Escalation before onsite-arrival stamping: if severity and status
 		# both change in the same save (rare, but possible), onsite_due
@@ -829,13 +833,54 @@ class ACSmartHandsRequest(Document):
 		if self.first_response_at:
 			self.idle_minutes = _minutes_between(self.first_response_at, self.confirmed_at)
 
+	def validate_completion_requirements(self):
+		"""CHANGE-SET-POST-DEMO.md section 9/10.3-4. Entering `Completed`
+		requires at least one proof-of-work image -- Authcor confirmed this
+		gate stays; the photograph is how both Authcor and the customer know
+		the physical work was actually done. Checked on every save while
+		status is Completed, not just the transition into it, so removing
+		every image afterwards can't leave a Completed ticket with none."""
+		if self.status != "Completed":
+			return
+		if not self.proof_of_work:
+			frappe.throw(_("At least one proof-of-work image is required before this ticket can be Completed."))
+
+	def _has_submitted_time_entry(self):
+		return bool(frappe.db.exists("AC Time Entry", {"ticket": self.name, "docstatus": 1}))
+
+	def validate_closure_requirements(self):
+		"""CHANGE-SET-POST-DEMO.md section 9/10.3. Entering `Closed` requires
+		at least one *submitted* time entry (a draft doesn't count) and proof
+		of work still present -- everything else optional. Both checked
+		together and named in one message, per Authcor's request that a
+		ticket which can't close says why it can't close, rather than
+		surfacing one missing item per round-trip."""
+		if self.status != "Closed":
+			return
+
+		missing = []
+		if not self.proof_of_work:
+			missing.append(_("proof of work"))
+		if not self._has_submitted_time_entry():
+			missing.append(_("a submitted time entry"))
+
+		if missing:
+			frappe.throw(_("Cannot close this ticket -- missing {0}.").format(_(" and ").join(missing)))
+
 	def stamp_completion(self):
 		"""(e) Stamp completed_on/completed_by the first time status becomes
-		Completed; clear both on any transition away from it. The "only
-		when currently empty" guard on the Completed branch is what makes
-		re-editing an already-completed ticket a no-op instead of
-		overwriting the original timestamp."""
-		if self.status == "Completed":
+		Completed; clear both on any transition away from it -- except into
+		Closed, which is a forward transition from Completed (post-demo:
+		added as the "documentation done" state that follows it), not a
+		reopening, so it must not erase when the work actually finished.
+		Jumping straight from an earlier status to Closed (skipping
+		Completed) stamps these the same way Completed itself would, since
+		validate_closure_requirements already established the work is done
+		by that point. The "only when currently empty" guard on the
+		Completed/Closed branch is what makes re-editing an
+		already-completed ticket a no-op instead of overwriting the
+		original timestamp."""
+		if self.status in ("Completed", "Closed"):
 			if not self.completed_on:
 				self.completed_on = now_datetime()
 			if not self.completed_by:

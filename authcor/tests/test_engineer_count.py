@@ -15,53 +15,73 @@ from authcor.tests.sla_fixtures import ensure_sla_policy_committed
 SGT = "Asia/Singapore"
 
 
+def _get_or_create(doctype, name, values):
+	"""Get-or-create by primary name, tolerating a leftover row from an
+	earlier interrupted run on a reused dev site -- CI always builds a
+	fresh site, so this never bites there. Same "get-or-mutate" shape as
+	sla_fixtures.ensure_sla_policy: an existing row is updated to match
+	`values` rather than trusted as-is."""
+	if frappe.db.exists(doctype, name):
+		doc = frappe.get_doc(doctype, name)
+		doc.update(values)
+		doc.save(ignore_permissions=True)
+		return doc
+	return frappe.get_doc(doctype=doctype, **values).insert(ignore_permissions=True)
+
+
 def _make_city(name):
-	return frappe.get_doc(doctype="AC City", city_name=name, country="Singapore", timezone=SGT).insert(
-		ignore_permissions=True
-	)
+	return _get_or_create("AC City", name, {"city_name": name, "country": "Singapore", "timezone": SGT})
 
 
 def _make_data_center(name, city):
-	return frappe.get_doc(doctype="AC Data Center", data_center_name=name, city=city).insert(
-		ignore_permissions=True
-	)
+	return _get_or_create("AC Data Center", name, {"data_center_name": name, "city": city})
+
+
+def _get_or_create_user(email):
+	if frappe.db.exists("User", email):
+		return frappe.get_doc("User", email)
+	return frappe.get_doc(
+		doctype="User", email=email, first_name=email.split("@", 1)[0], send_welcome_email=0
+	).insert(ignore_permissions=True)
 
 
 def _make_engineer(email):
-	user = frappe.get_doc(
-		doctype="User", email=email, first_name=email.split("@", 1)[0], send_welcome_email=0
-	).insert(ignore_permissions=True)
+	user = _get_or_create_user(email)
 	user.add_roles("Operations L3 Authorizer")
-	profile = frappe.get_doc(
-		doctype="AC Engineer Profile",
-		user=user.name,
-		phone="+65 8000 0000",
-		id_type="NRIC",
-		id_number="S1234567A",
-		is_active=1,
-	).insert(ignore_permissions=True)
+	profile = _get_or_create(
+		"AC Engineer Profile",
+		user.name,
+		{
+			"user": user.name,
+			"phone": "+65 8000 0000",
+			"id_type": "NRIC",
+			"id_number": "S1234567A",
+			"is_active": 1,
+		},
+	)
 	return user, profile
 
 
 def _make_user(email, roles):
-	user = frappe.get_doc(
-		doctype="User", email=email, first_name=email.split("@", 1)[0], send_welcome_email=0
-	).insert(ignore_permissions=True)
+	user = _get_or_create_user(email)
 	for role in roles:
 		user.add_roles(role)
 	return user
 
 
 def _make_customer(name, authorised_engineers, portal_users=None):
-	return frappe.get_doc(
-		doctype="AC Customer",
-		customer_name=name,
-		service_level="Standard",
-		authorised_engineers=[{"engineer": u} for u in authorised_engineers],
-		portal_users=[
-			{"user": u, "authorizer_level": "L1 Authorizer", "is_active": 1} for u in (portal_users or [])
-		],
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC Customer",
+		name,
+		{
+			"customer_name": name,
+			"service_level": "Standard",
+			"authorised_engineers": [{"engineer": u} for u in authorised_engineers],
+			"portal_users": [
+				{"user": u, "authorizer_level": "L1 Authorizer", "is_active": 1} for u in (portal_users or [])
+			],
+		},
+	)
 
 
 def _grant_customer_access(user, customer):
@@ -87,9 +107,9 @@ def _make_ticket(customer, city, data_center, engineers_required=1):
 		data_center=data_center,
 		subject="Engineer count test ticket",
 		description="Test",
-		action_required="Remote Hands",
+		action_required="Smart Hands",
 		engineers_required=engineers_required,
-		status="In Pool",
+		status="Open",
 	).insert(ignore_permissions=True)
 
 
@@ -254,7 +274,7 @@ class TestEngineerCountChange(IntegrationTestCase):
 
 		reloaded = self._reload(ticket.name)
 		self.assertEqual(reloaded.engineers_required, 2)
-		self.assertEqual(reloaded.status, "In Pool")
+		self.assertEqual(reloaded.status, "Open")
 
 	def test_decrease_request_on_in_progress_ticket_rejected(self):
 		ticket = self._new_ticket(engineers_required=2)
@@ -361,7 +381,7 @@ class TestEngineerCountChange(IntegrationTestCase):
 		reloaded = self._reload(ticket.name)
 		self.assertEqual(len(reloaded.assigned_engineers), 0)
 		self.assertEqual(reloaded.engineers_required, 1)
-		self.assertEqual(reloaded.status, "In Pool")
+		self.assertEqual(reloaded.status, "Open")
 
 		reloaded_request = frappe.get_doc("AC Engineer Count Request", request.name)
 		self.assertEqual(reloaded_request.status, "Approved")

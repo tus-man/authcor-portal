@@ -6,34 +6,54 @@ from authcor.tests.sla_fixtures import ensure_sla_policy
 SGT = "Asia/Singapore"
 
 
+def _get_or_create(doctype, name, values):
+	"""Get-or-create by primary name, tolerating a leftover row from an
+	earlier interrupted run on a reused dev site -- CI always builds a
+	fresh site, so this never bites there. Same "get-or-mutate" shape as
+	sla_fixtures.ensure_sla_policy: an existing row is updated to match
+	`values` rather than trusted as-is."""
+	if frappe.db.exists(doctype, name):
+		doc = frappe.get_doc(doctype, name)
+		doc.update(values)
+		doc.save(ignore_permissions=True)
+		return doc
+	return frappe.get_doc(doctype=doctype, **values).insert(ignore_permissions=True)
+
+
 def _make_city(city_name):
-	return frappe.get_doc(
-		doctype="AC City", city_name=city_name, country="Singapore", timezone=SGT
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC City", city_name, {"city_name": city_name, "country": "Singapore", "timezone": SGT}
+	)
 
 
 def _make_data_center(data_center_name, city):
-	return frappe.get_doc(
-		doctype="AC Data Center", data_center_name=data_center_name, city=city
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC Data Center", data_center_name, {"data_center_name": data_center_name, "city": city}
+	)
 
 
 def _make_customer(customer_name, authorised_engineers=None):
-	return frappe.get_doc(
-		doctype="AC Customer",
-		customer_name=customer_name,
-		service_level="Standard",
-		authorised_engineers=[{"engineer": u} for u in (authorised_engineers or [])],
-	).insert(ignore_permissions=True)
+	return _get_or_create(
+		"AC Customer",
+		customer_name,
+		{
+			"customer_name": customer_name,
+			"service_level": "Standard",
+			"authorised_engineers": [{"engineer": u} for u in (authorised_engineers or [])],
+		},
+	)
 
 
 def _make_user(email, roles=None):
-	user = frappe.get_doc(
-		doctype="User",
-		email=email,
-		first_name=email.split("@", 1)[0],
-		send_welcome_email=0,
-	).insert(ignore_permissions=True)
+	if frappe.db.exists("User", email):
+		user = frappe.get_doc("User", email)
+	else:
+		user = frappe.get_doc(
+			doctype="User",
+			email=email,
+			first_name=email.split("@", 1)[0],
+			send_welcome_email=0,
+		).insert(ignore_permissions=True)
 	for role in roles or []:
 		user.add_roles(role)
 	return user
@@ -48,7 +68,7 @@ def _make_ticket(customer, city, data_center, **overrides):
 		"data_center": data_center,
 		"subject": "Visibility test ticket",
 		"description": "Test",
-		"action_required": "Remote Hands",
+		"action_required": "Smart Hands",
 	}
 	values.update(overrides)
 	return frappe.get_doc(values).insert(ignore_permissions=True)
