@@ -1,0 +1,105 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "field:rule_name",
+ "creation": "2026-08-23 20:56:34.670316",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "rule_name",
+  "trigger",
+  "severity",
+  "service_level",
+  "threshold_minutes",
+  "notify_roles",
+  "notify_leads_heads",
+  "channels",
+  "is_active"
+ ],
+ "fields": [
+  {
+   "fieldname": "rule_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Rule Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "trigger",
+   "fieldtype": "Select",
+   "label": "Trigger",
+   "options": "Unclaimed\nResponse SLA Breach\nOnsite SLA Breach\nUnconfirmed"
+  },
+  {
+   "fieldname": "severity",
+   "fieldtype": "Select",
+   "label": "Applies To Severity",
+   "options": "Any\nP1\nP2\nP3\nP4"
+  },
+  {
+   "fieldname": "service_level",
+   "fieldtype": "Select",
+   "label": "Applies To Service Level",
+   "options": "Any\nPremium\nStandard\nBasic\nP4-Scheduled"
+  },
+  {
+   "fieldname": "threshold_minutes",
+   "fieldtype": "Int",
+   "label": "Threshold (min)"
+  },
+  {
+   "fieldname": "notify_roles",
+   "fieldtype": "Table MultiSelect",
+   "label": "Notify Roles",
+   "options": "AC Escalation Role"
+  },
+  {
+   "default": "0",
+   "fieldname": "notify_leads_heads",
+   "fieldtype": "Check",
+   "label": "Also Notify Leads & Heads"
+  },
+  {
+   "fieldname": "channels",
+   "fieldtype": "Select",
+   "label": "Channels",
+   "options": "Email\nEmail + Telegram"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-23 21:05:25.581712",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC Escalation Rule",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

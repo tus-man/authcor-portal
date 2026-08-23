@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-08-23 20:38:00.295433",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "event_key",
+  "reference_doctype",
+  "reference_name",
+  "channel",
+  "recipient",
+  "recipient_address",
+  "status",
+  "error",
+  "sent_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Series",
+   "options": "AC-NOT-.YYYY.-.#####"
+  },
+  {
+   "fieldname": "event_key",
+   "fieldtype": "Data",
+   "label": "Event"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference",
+   "options": "reference_doctype"
+  },
+  {
+   "fieldname": "channel",
+   "fieldtype": "Select",
+   "label": "Channel",
+   "options": "Email\nTelegram\nWhatsApp"
+  },
+  {
+   "fieldname": "recipient",
+   "fieldtype": "Link",
+   "label": "Recipient",
+   "options": "User"
+  },
+  {
+   "fieldname": "recipient_address",
+   "fieldtype": "Data",
+   "label": "Address"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Queued\nSent\nFailed\nSkipped"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error"
+  },
+  {
+   "fieldname": "sent_on",
+   "fieldtype": "Datetime",
+   "label": "Sent On"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-23 20:43:56.322988",
+ "modified_by": "Administrator",
+ "module": "Authcor",
+ "name": "AC Notification Log",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
