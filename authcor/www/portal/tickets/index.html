@@ -1,0 +1,83 @@
+{% extends "authcor/templates/portal_base.html" %}
+
+{% block portal_content %}
+<div class="pt-page-head">
+	<div>
+		<h1>{{ _("Tickets") }}</h1>
+		<p>{{ _("Smart hands requests raised by your team.") }}</p>
+	</div>
+	<a class="pt-btn" href="/portal/tickets/new">{{ _("Raise a ticket") }}</a>
+</div>
+
+<div class="pt-card">
+	<form class="pt-filter" method="get" action="/portal/tickets">
+		<div class="pt-field">
+			<label for="status">{{ _("Status") }}</label>
+			<select id="status" name="status">
+				<option value="">{{ _("All statuses") }}</option>
+				{%- for option in tickets.status_options %}
+				<option value="{{ option | e }}"
+					{%- if option == tickets.status %} selected{% endif %}>{{ _(option) | e }}</option>
+				{%- endfor %}
+			</select>
+		</div>
+		<button class="pt-btn pt-btn--ghost" type="submit">{{ _("Filter") }}</button>
+		{%- if tickets.status %}
+		<a class="pt-btn pt-btn--ghost" href="/portal/tickets">{{ _("Clear") }}</a>
+		{%- endif %}
+	</form>
+</div>
+
+<div class="pt-card pt-card--flush">
+	<div class="pt-table-wrap">
+		<table class="pt-table pt-table--stack">
+			<thead>
+				<tr>
+					<th scope="col">{{ _("Ticket") }}</th>
+					<th scope="col">{{ _("Subject") }}</th>
+					<th scope="col">{{ _("Data Center") }}</th>
+					<th scope="col">{{ _("Severity") }}</th>
+					<th scope="col">{{ _("Status") }}</th>
+					<th scope="col">{{ _("Created") }}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{%- for row in tickets.rows %}
+				<tr>
+					<td data-label="{{ _("Ticket") }}">
+						<a href="/portal/tickets/{{ row.name | e }}">{{ row.name | e }}</a>
+					</td>
+					<td data-label="{{ _("Subject") }}">{{ row.subject | e }}</td>
+					<td data-label="{{ _("Data Center") }}">{{ row.data_center | e }}</td>
+					<td data-label="{{ _("Severity") }}"><span class="pt-sev">{{ row.severity | e }}</span></td>
+					<td data-label="{{ _("Status") }}">
+						<span class="pt-badge pt-badge--{{ row.status_class }}">{{ _(row.status) | e }}</span>
+					</td>
+					<td data-label="{{ _("Created") }}">{{ row.created | e }}</td>
+				</tr>
+				{%- else %}
+				<tr>
+					<td colspan="6"><p class="pt-empty">{{ _("No tickets to show.") }}</p></td>
+				</tr>
+				{%- endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
+
+{%- if tickets.prev_url or tickets.next_url %}
+<div class="pt-pager">
+	{%- if tickets.prev_url %}
+	<a class="pt-btn pt-btn--ghost" href="{{ tickets.prev_url | e }}">{{ _("Previous") }}</a>
+	{%- else %}
+	<span></span>
+	{%- endif %}
+	<span>{{ _("Page {0}").format(tickets.page) }}</span>
+	{%- if tickets.next_url %}
+	<a class="pt-btn pt-btn--ghost" href="{{ tickets.next_url | e }}">{{ _("Next") }}</a>
+	{%- else %}
+	<span></span>
+	{%- endif %}
+</div>
+{%- endif %}
+{% endblock %}

@@ -1,0 +1,462 @@
+{% extends "authcor/templates/portal_base.html" %}
+
+{#-
+	Every value below comes from build_portal_ticket_view's explicit
+	permlevel-0 projection. `ticket` is a dict, not a document: there is no
+	way to reach an internal field from this template, which is the point.
+
+	`ticket.description_html` is the single value rendered unescaped. It is
+	Text Editor content, sanitised twice -- once by Frappe on save, once by
+	build_portal_ticket_view on the way out.
+-#}
+
+{% block portal_content %}
+<div class="pt-page-head">
+	<div>
+		<h1>{{ ticket.name | e }}</h1>
+		<p>{{ ticket.subject | e }}</p>
+	</div>
+	<span class="pt-badge pt-badge--{{ ticket.status_class }}">{{ _(ticket.status) | e }}</span>
+</div>
+
+<p><a href="/portal/tickets">&larr; {{ _("All tickets") }}</a></p>
+
+<div class="pt-card">
+	<dl class="pt-facts">
+		<div>
+			<dt>{{ _("Data Center") }}</dt>
+			<dd>{{ ticket.data_center | e }}</dd>
+		</div>
+		<div>
+			<dt>{{ _("Location") }}</dt>
+			<dd>{{ ticket.city | e }}, {{ ticket.country | e }}</dd>
+		</div>
+		<div>
+			<dt>{{ _("Severity") }}</dt>
+			<dd>{{ ticket.severity | e }}</dd>
+		</div>
+		<div>
+			<dt>{{ _("Action Required") }}</dt>
+			<dd>
+				{{ _(ticket.action_required) | e }}
+				{%- if ticket.action_other_details %} &mdash; {{ ticket.action_other_details | e }}{% endif %}
+			</dd>
+		</div>
+		<div>
+			<dt>{{ _("Engineers Required") }}</dt>
+			<dd>{{ ticket.engineers_required }}</dd>
+		</div>
+		<div>
+			<dt>{{ _("Raised") }}</dt>
+			<dd>{{ ticket.created | e }}</dd>
+		</div>
+		{%- if ticket.confirmed_display %}
+		<div>
+			<dt>{{ _("Confirmed Visit") }}</dt>
+			<dd>{{ ticket.confirmed_display | e }}</dd>
+		</div>
+		{%- endif %}
+		{%- if ticket.external_reference %}
+		<div>
+			<dt>{{ _("Your Reference") }}</dt>
+			<dd>{{ ticket.external_reference | e }}</dd>
+		</div>
+		{%- endif %}
+		{%- if ticket.dc_access_ticket_number %}
+		<div>
+			<dt>{{ _("DC Access Ticket") }}</dt>
+			<dd>{{ ticket.dc_access_ticket_number | e }}</dd>
+		</div>
+		{%- endif %}
+	</dl>
+</div>
+
+<div class="pt-grid-2">
+	<div>
+		<div class="pt-card">
+			<h2>{{ _("Request") }}</h2>
+			{%- if ticket.target_equipment %}
+			<h3>{{ _("Target Equipment") }}</h3>
+			<p class="pt-pre">{{ ticket.target_equipment | e }}</p>
+			{%- endif %}
+			<h3>{{ _("Description") }}</h3>
+			<div class="pt-prose">{{ ticket.description_html }}</div>
+		</div>
+
+		<div class="pt-card">
+			<h2>{{ _("Engineers") }}</h2>
+			{%- if ticket.engineers %}
+			<div class="pt-table-wrap">
+				<table class="pt-table pt-table--stack">
+					<thead>
+						<tr>
+							<th scope="col">{{ _("Engineer") }}</th>
+							<th scope="col">{{ _("Role") }}</th>
+							<th scope="col">{{ _("Assigned") }}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{%- for engineer in ticket.engineers %}
+						<tr>
+							<td data-label="{{ _("Engineer") }}">{{ engineer.full_name | e }}</td>
+							<td data-label="{{ _("Role") }}">{{ _(engineer.assignment_type or "") | e }}</td>
+							<td data-label="{{ _("Assigned") }}">{{ engineer.claimed | e }}</td>
+						</tr>
+						{%- endfor %}
+					</tbody>
+				</table>
+			</div>
+			{%- else %}
+			<p class="pt-empty">{{ _("No engineer has been assigned yet.") }}</p>
+			{%- endif %}
+		</div>
+
+		<div class="pt-card">
+			<h2>{{ _("Hours") }}</h2>
+			{%- if ticket.work.engineer_hours %}
+			<div class="pt-table-wrap">
+				<table class="pt-table pt-table--stack">
+					<thead>
+						<tr>
+							<th scope="col">{{ _("Engineer") }}</th>
+							<th scope="col" class="pt-num">{{ _("Hours") }}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{%- for row in ticket.work.engineer_hours %}
+						<tr>
+							<td data-label="{{ _("Engineer") }}">{{ row.engineer | e }}</td>
+							<td data-label="{{ _("Hours") }}" class="pt-num">{{ row.hours }}</td>
+						</tr>
+						{%- endfor %}
+					</tbody>
+					<tfoot>
+						<tr>
+							<td data-label="{{ _("Total") }}">{{ _("Total") }}</td>
+							<td data-label="{{ _("Hours") }}" class="pt-num">{{ ticket.work.total_hours }}</td>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+			{%- else %}
+			<p class="pt-empty">{{ _("No hours have been logged yet.") }}</p>
+			{%- endif %}
+		</div>
+
+		<div class="pt-card">
+			<h2>{{ _("Expenses") }}</h2>
+			{%- if ticket.work.expenses %}
+			<div class="pt-table-wrap">
+				<table class="pt-table pt-table--stack">
+					<thead>
+						<tr>
+							<th scope="col">{{ _("Category") }}</th>
+							<th scope="col">{{ _("Description") }}</th>
+							<th scope="col" class="pt-num">{{ _("Amount") }}</th>
+							<th scope="col">{{ _("Receipt") }}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{%- for claim in ticket.work.expenses %}
+						<tr>
+							<td data-label="{{ _("Category") }}">{{ _(claim.category or "") | e }}</td>
+							<td data-label="{{ _("Description") }}">{{ claim.description | e }}</td>
+							<td data-label="{{ _("Amount") }}" class="pt-num">{{ claim.amount | e }}</td>
+							<td data-label="{{ _("Receipt") }}">
+								{%- if claim.receipt %}
+								<a href="{{ claim.receipt | e }}" target="_blank" rel="noopener">{{ _("View") }}</a>
+								{%- endif %}
+							</td>
+						</tr>
+						{%- endfor %}
+					</tbody>
+					<tfoot>
+						<tr>
+							<td data-label="{{ _("Total") }}" colspan="2">{{ _("Total") }}</td>
+							<td data-label="{{ _("Amount") }}" class="pt-num">{{ ticket.work.total_expenses }}</td>
+							<td></td>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+			{%- else %}
+			<p class="pt-empty">{{ _("No expenses have been claimed.") }}</p>
+			{%- endif %}
+		</div>
+
+		{%- if ticket.proof_images %}
+		<div class="pt-card">
+			<h2>{{ _("Proof of Work") }}</h2>
+			<div class="pt-proof">
+				{%- for image in ticket.proof_images %}
+				<figure>
+					<img src="{{ image.image | e }}" alt="{{ (image.caption or image.image_type or "") | e }}">
+					<figcaption>
+						{{ _(image.image_type or "") | e }}
+						{%- if image.caption %} &mdash; {{ image.caption | e }}{% endif %}
+					</figcaption>
+				</figure>
+				{%- endfor %}
+			</div>
+		</div>
+		{%- endif %}
+
+		{%- if ticket.attachments %}
+		<div class="pt-card">
+			<h2>{{ _("Attachments") }}</h2>
+			<ul class="pt-files">
+				{%- for file in ticket.attachments %}
+				<li><a href="{{ file.file_url | e }}" target="_blank" rel="noopener">{{ file.file_name | e }}</a></li>
+				{%- endfor %}
+			</ul>
+		</div>
+		{%- endif %}
+	</div>
+
+	<div>
+		<div class="pt-card">
+			<h2>{{ _("Timeline") }}</h2>
+			<ol class="pt-timeline">
+				{%- for entry in ticket.timeline %}
+				<li>
+					{{ entry.label | e }}
+					<time>{{ entry.at | e }}</time>
+				</li>
+				{%- endfor %}
+			</ol>
+		</div>
+
+		{#- Actions, each one available only in the state section 4 allows. -#}
+
+		{%- if ticket.can_amend_slots %}
+		<div class="pt-card">
+			<h2>{{ _("Preferred Slots") }}</h2>
+			<p class="pt-hint">{{ _("Change the dates and time bands you are available while the visit is still unconfirmed.") }}</p>
+			<form id="pt-slot-form"
+				data-ticket="{{ ticket.name | e }}"
+				data-method="{{ ticket.methods.amend_slots | e }}"
+				data-busy-label="{{ _("Saving...") }}">
+				<p class="pt-error" role="alert"></p>
+				<div class="pt-table-wrap">
+					<table class="pt-table pt-slots">
+						<thead>
+							<tr>
+								<th scope="col">{{ _("Date") }}</th>
+								{%- for band, label in ticket.slot_band_labels %}
+								<th scope="col">{{ label }}</th>
+								{%- endfor %}
+							</tr>
+						</thead>
+						<tbody>
+							{%- for slot in ticket.slots %}
+							<tr data-slot-date="{{ slot.slot_date | e }}">
+								<td>{{ slot.slot_label | e }}</td>
+								{%- for band, label in ticket.slot_band_labels %}
+								<td>
+									<input type="checkbox" data-band="{{ band }}"
+										aria-label="{{ slot.slot_label | e }} {{ label }}"
+										{%- if slot[band] %} checked{% endif %}>
+								</td>
+								{%- endfor %}
+							</tr>
+							{%- endfor %}
+						</tbody>
+					</table>
+				</div>
+				<div class="pt-actions">
+					<button class="pt-btn" type="submit">{{ _("Save slots") }}</button>
+				</div>
+			</form>
+		</div>
+		{%- elif ticket.slots %}
+		<div class="pt-card">
+			<h2>{{ _("Preferred Slots") }}</h2>
+			<div class="pt-table-wrap">
+				<table class="pt-table pt-slots">
+					<thead>
+						<tr>
+							<th scope="col">{{ _("Date") }}</th>
+							{%- for band, label in ticket.slot_band_labels %}
+							<th scope="col">{{ label }}</th>
+							{%- endfor %}
+						</tr>
+					</thead>
+					<tbody>
+						{%- for slot in ticket.slots %}
+						<tr>
+							<td>{{ slot.slot_label | e }}</td>
+							{%- for band, label in ticket.slot_band_labels %}
+							<td>{{ "&#10003;" if slot[band] else "&mdash;" }}</td>
+							{%- endfor %}
+						</tr>
+						{%- endfor %}
+					</tbody>
+				</table>
+			</div>
+		</div>
+		{%- endif %}
+
+		{%- if ticket.can_enter_dc_access %}
+		<div class="pt-card">
+			<h2>{{ _("Data Centre Access") }}</h2>
+			<p class="pt-hint">{{ _("Once you have filed the access request with the data centre, enter the access ticket number they issued.") }}</p>
+			<form id="pt-dc-form"
+				data-ticket="{{ ticket.name | e }}"
+				data-method="{{ ticket.methods.set_dc_access | e }}"
+				data-busy-label="{{ _("Saving...") }}">
+				<p class="pt-error" role="alert"></p>
+				<div class="pt-field">
+					<label for="pt-dc-number">{{ _("DC Access Ticket Number") }}</label>
+					<input id="pt-dc-number" name="number" type="text" maxlength="140"
+						value="{{ ticket.dc_access_ticket_number | e if ticket.dc_access_ticket_number else "" }}"
+						required>
+				</div>
+				<div class="pt-actions">
+					<button class="pt-btn" type="submit">{{ _("Save number") }}</button>
+				</div>
+			</form>
+		</div>
+		{%- endif %}
+
+		{%- if ticket.pending_count_request %}
+		<div class="pt-card">
+			<h2>{{ _("Engineer Count") }}</h2>
+			<p class="pt-note">
+				{{ _("A change from {0} to {1} engineers is waiting on Authcor.").format(
+					ticket.pending_count_request.current_count,
+					ticket.pending_count_request.requested_count) }}
+			</p>
+			<form id="pt-withdraw-form"
+				data-request="{{ ticket.pending_count_request.name | e }}"
+				data-method="{{ ticket.methods.withdraw_count | e }}"
+				data-busy-label="{{ _("Withdrawing...") }}">
+				<p class="pt-error" role="alert"></p>
+				<div class="pt-actions">
+					<button class="pt-btn pt-btn--ghost" type="submit">{{ _("Withdraw request") }}</button>
+				</div>
+			</form>
+		</div>
+		{%- elif ticket.can_change_count %}
+		<div class="pt-card">
+			<h2>{{ _("Engineer Count") }}</h2>
+			<p class="pt-hint">{{ _("Asking for more engineers takes effect straight away. Asking for fewer goes to Authcor for approval, since someone may already have been assigned.") }}</p>
+			<form id="pt-count-form"
+				data-ticket="{{ ticket.name | e }}"
+				data-current-count="{{ ticket.engineers_required }}"
+				data-increase-method="{{ ticket.methods.increase_count | e }}"
+				data-decrease-method="{{ ticket.methods.decrease_count | e }}"
+				data-busy-label="{{ _("Sending...") }}">
+				<p class="pt-error" role="alert"></p>
+				<div class="pt-field">
+					<label for="pt-count">{{ _("Engineers Required") }}</label>
+					<input id="pt-count" name="requested_count" type="number" min="1" step="1"
+						value="{{ ticket.engineers_required }}" required>
+				</div>
+				<div class="pt-field">
+					<label for="pt-count-reason">{{ _("Reason (for a reduction)") }}</label>
+					<textarea id="pt-count-reason" name="reason" rows="2"></textarea>
+				</div>
+				<div class="pt-actions">
+					<button class="pt-btn" type="submit">{{ _("Request change") }}</button>
+				</div>
+			</form>
+		</div>
+		{%- endif %}
+	</div>
+</div>
+{% endblock %}
+
+{% block portal_script %}
+<script>
+(function () {
+	"use strict";
+
+	var portal = window.authcorPortal;
+
+	/* One submit handler shape for every action on this page: stop the
+	 * native post, run the whitelisted call, reload on success so the
+	 * page re-renders from the server rather than being patched up in the
+	 * browser. Errors come back as the server's own message. */
+	function wire(form, handler) {
+		if (!form) {
+			return;
+		}
+		form.addEventListener("submit", function (event) {
+			event.preventDefault();
+			var errorBox = form.querySelector(".pt-error");
+			var button = form.querySelector("button[type=submit]");
+			portal.clearError(errorBox);
+			var restore = portal.busy(button, form.getAttribute("data-busy-label"));
+			Promise.resolve()
+				.then(function () {
+					return handler(form);
+				})
+				.then(function () {
+					window.location.reload();
+				})
+				.catch(function (error) {
+					restore();
+					portal.showError(errorBox, error);
+				});
+		});
+	}
+
+	wire(document.getElementById("pt-slot-form"), function (form) {
+		var rows = Array.prototype.map.call(
+			form.querySelectorAll("tr[data-slot-date]"),
+			function (row) {
+				var slot = { slot_date: row.getAttribute("data-slot-date") };
+				Array.prototype.forEach.call(row.querySelectorAll("input[data-band]"), function (box) {
+					slot[box.getAttribute("data-band")] = box.checked ? 1 : 0;
+				});
+				return slot;
+			}
+		);
+		return portal.call(form.getAttribute("data-method"), {
+			ticket: form.getAttribute("data-ticket"),
+			slots: rows
+		});
+	});
+
+	wire(document.getElementById("pt-dc-form"), function (form) {
+		return portal.call(form.getAttribute("data-method"), {
+			ticket: form.getAttribute("data-ticket"),
+			dc_access_ticket_number: form.elements.number.value
+		});
+	});
+
+	wire(document.getElementById("pt-withdraw-form"), function (form) {
+		return portal.call(form.getAttribute("data-method"), {
+			request: form.getAttribute("data-request")
+		});
+	});
+
+	/* The direction decides which of the two existing methods is called:
+	 * an increase is a direct edit, a decrease is a request Authcor has to
+	 * approve because engineers may already have claimed. */
+	wire(document.getElementById("pt-count-form"), function (form) {
+		var requested = parseInt(form.elements.requested_count.value, 10);
+		var current = parseInt(form.getAttribute("data-current-count"), 10);
+		var ticket = form.getAttribute("data-ticket");
+
+		if (!requested || requested < 1) {
+			throw new Error("Enter how many engineers you need.");
+		}
+		if (requested === current) {
+			throw new Error("That is already the number of engineers on this ticket.");
+		}
+		if (requested > current) {
+			return portal.call(form.getAttribute("data-increase-method"), {
+				ticket: ticket,
+				new_count: requested
+			});
+		}
+		return portal.call(form.getAttribute("data-decrease-method"), {
+			ticket: ticket,
+			requested_count: requested,
+			reason: form.elements.reason.value
+		});
+	});
+})();
+</script>
+{% endblock %}

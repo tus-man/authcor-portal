@@ -1,0 +1,289 @@
+{% extends "authcor/templates/portal_base.html" %}
+
+{% block portal_content %}
+<div class="pt-page-head">
+	<div>
+		<h1>{{ _("Raise a ticket") }}</h1>
+		<p>{{ _("Smart hands work at one of your data centres.") }}</p>
+	</div>
+	<a class="pt-btn pt-btn--ghost" href="/portal/tickets">{{ _("Cancel") }}</a>
+</div>
+
+{%- if not service_areas %}
+<div class="pt-card">
+	<p class="pt-error">{{ _("No data centres are set up for your account yet. Contact Authcor and they will add your service areas.") }}</p>
+</div>
+{%- else %}
+
+<form id="pt-new-ticket"
+	data-method="{{ create_method | e }}"
+	data-busy-label="{{ _("Raising ticket...") }}">
+	<p class="pt-error" role="alert"></p>
+
+	<div class="pt-card">
+		<h2>{{ _("Where") }}</h2>
+		<div class="pt-field-row">
+			<div class="pt-field">
+				<label for="pt-country">{{ _("Country") }}</label>
+				<select id="pt-country" name="country" required></select>
+			</div>
+			<div class="pt-field">
+				<label for="pt-city">{{ _("City") }}</label>
+				<select id="pt-city" name="city" required></select>
+			</div>
+			<div class="pt-field">
+				<label for="pt-data-center">{{ _("Data Center") }}</label>
+				<select id="pt-data-center" name="data_center" required></select>
+			</div>
+		</div>
+	</div>
+
+	<div class="pt-card">
+		<h2>{{ _("What") }}</h2>
+		<div class="pt-field">
+			<label for="pt-subject">{{ _("Subject") }}</label>
+			<input id="pt-subject" name="subject" type="text" maxlength="140" required>
+		</div>
+
+		<div class="pt-field-row">
+			<div class="pt-field">
+				<label for="pt-severity">{{ _("Severity") }}</label>
+				<select id="pt-severity" name="severity">
+					{%- for option in severity_options %}
+					<option value="{{ option | e }}"{% if option == "P4" %} selected{% endif %}>{{ option | e }}</option>
+					{%- endfor %}
+				</select>
+			</div>
+			<div class="pt-field">
+				<label for="pt-action">{{ _("Action Required") }}</label>
+				<select id="pt-action" name="action_required">
+					{%- for option in action_options %}
+					<option value="{{ option | e }}">{{ _(option) | e }}</option>
+					{%- endfor %}
+				</select>
+			</div>
+			<div class="pt-field">
+				<label for="pt-engineers">{{ _("Engineers Required") }}</label>
+				<input id="pt-engineers" name="engineers_required" type="number" min="1" step="1" value="1" required>
+			</div>
+		</div>
+
+		<div class="pt-field" id="pt-other-details-field" hidden>
+			<label for="pt-other-details">{{ _("Other Details") }}</label>
+			<input id="pt-other-details" name="action_other_details" type="text" maxlength="140">
+			<p class="pt-hint">{{ _("Required when the action is Others.") }}</p>
+		</div>
+
+		<div class="pt-field">
+			<label for="pt-target">{{ _("Target Equipment") }}</label>
+			<textarea id="pt-target" name="target_equipment" rows="2"></textarea>
+			<p class="pt-hint">{{ _("Rack, cage, or device the engineer should work on.") }}</p>
+		</div>
+
+		<div class="pt-field">
+			<label for="pt-description">{{ _("Description") }}</label>
+			<textarea id="pt-description" name="description" rows="6" required></textarea>
+		</div>
+
+		<div class="pt-field">
+			<label for="pt-attachments">{{ _("Attachments") }}</label>
+			<input id="pt-attachments" name="attachments" type="file" multiple>
+			<p class="pt-hint">{{ _("Diagrams, photographs or paperwork the engineer will need. Up to 10 files.") }}</p>
+		</div>
+
+		<div class="pt-field">
+			<label for="pt-reference">{{ _("Your Reference") }}</label>
+			<input id="pt-reference" name="external_reference" type="text" maxlength="140">
+			<p class="pt-hint">{{ _("Your own ticket or change number, if you have one.") }}</p>
+		</div>
+	</div>
+
+	<div class="pt-card">
+		<h2>{{ _("When") }}</h2>
+		<p class="pt-hint">{{ _("Every band is offered by default. Untick anything that does not work for you, and Authcor will confirm one of the slots you leave ticked.") }}</p>
+		<div class="pt-table-wrap">
+			<table class="pt-table pt-slots">
+				<thead>
+					<tr>
+						<th scope="col">{{ _("Date") }}</th>
+						{%- for band, label in slot_band_labels %}
+						<th scope="col">{{ label }}</th>
+						{%- endfor %}
+					</tr>
+				</thead>
+				<tbody>
+					{%- for slot in slots %}
+					<tr data-slot-date="{{ slot.slot_date | e }}">
+						<td>{{ slot.slot_label | e }}</td>
+						{%- for band, label in slot_band_labels %}
+						<td>
+							<input type="checkbox" data-band="{{ band }}"
+								aria-label="{{ slot.slot_label | e }} {{ label }}"
+								{%- if slot[band] %} checked{% endif %}>
+						</td>
+						{%- endfor %}
+					</tr>
+					{%- endfor %}
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<div class="pt-actions">
+		<button class="pt-btn" type="submit">{{ _("Raise ticket") }}</button>
+		<a class="pt-btn pt-btn--ghost" href="/portal/tickets">{{ _("Cancel") }}</a>
+	</div>
+</form>
+
+<script type="application/json" id="pt-service-areas">{{ service_areas_json }}</script>
+{%- endif %}
+{% endblock %}
+
+{% block portal_script %}
+<script>
+(function () {
+	"use strict";
+
+	var portal = window.authcorPortal;
+	var form = document.getElementById("pt-new-ticket");
+	var treeHolder = document.getElementById("pt-service-areas");
+	if (!form || !treeHolder) {
+		return;
+	}
+
+	var tree = JSON.parse(treeHolder.textContent);
+	var defaults = {
+		country: {{ (default_country or "") | json }},
+		city: {{ (default_city or "") | json }}
+	};
+
+	var countrySelect = form.elements.country;
+	var citySelect = form.elements.city;
+	var dcSelect = form.elements.data_center;
+
+	/* The cascade: each select is rebuilt from this customer's own service
+	 * tree, so a city or data centre outside it is not merely rejected on
+	 * submit -- it is never offered. The server re-checks regardless. */
+	function fill(select, values, preferred) {
+		select.textContent = "";
+		values.forEach(function (value) {
+			var option = document.createElement("option");
+			option.value = value;
+			option.textContent = value;
+			select.appendChild(option);
+		});
+		if (preferred && values.indexOf(preferred) !== -1) {
+			select.value = preferred;
+		}
+	}
+
+	function countryEntry() {
+		return tree.filter(function (entry) {
+			return entry.name === countrySelect.value;
+		})[0];
+	}
+
+	function cityEntry() {
+		var entry = countryEntry();
+		if (!entry) {
+			return null;
+		}
+		return entry.cities.filter(function (city) {
+			return city.name === citySelect.value;
+		})[0];
+	}
+
+	function refreshCities(preferred) {
+		var entry = countryEntry();
+		fill(citySelect, entry ? entry.cities.map(function (city) { return city.name; }) : [], preferred);
+		refreshDataCenters();
+	}
+
+	function refreshDataCenters() {
+		var city = cityEntry();
+		fill(dcSelect, city ? city.data_centers : [], null);
+	}
+
+	fill(countrySelect, tree.map(function (entry) { return entry.name; }), defaults.country);
+	refreshCities(defaults.city);
+
+	countrySelect.addEventListener("change", function () { refreshCities(null); });
+	citySelect.addEventListener("change", refreshDataCenters);
+
+	var otherDetailsField = document.getElementById("pt-other-details-field");
+	var actionSelect = form.elements.action_required;
+
+	function refreshOtherDetails() {
+		var isOther = actionSelect.value === "Others";
+		otherDetailsField.hidden = !isOther;
+		form.elements.action_other_details.required = isOther;
+	}
+
+	actionSelect.addEventListener("change", refreshOtherDetails);
+	refreshOtherDetails();
+
+	function collectSlots() {
+		return Array.prototype.map.call(
+			form.querySelectorAll("tr[data-slot-date]"),
+			function (row) {
+				var slot = { slot_date: row.getAttribute("data-slot-date") };
+				Array.prototype.forEach.call(row.querySelectorAll("input[data-band]"), function (box) {
+					slot[box.getAttribute("data-band")] = box.checked ? 1 : 0;
+				});
+				return slot;
+			}
+		);
+	}
+
+	/* Files go up first, unattached, and their File names are handed to
+	 * create_portal_ticket, which links them to the ticket server-side
+	 * after checking this session owns them. */
+	function uploadAttachments() {
+		var files = Array.prototype.slice.call(form.elements.attachments.files || []);
+		if (!files.length) {
+			return Promise.resolve([]);
+		}
+		if (files.length > 10) {
+			return Promise.reject(new Error("Attach at most 10 files."));
+		}
+		return Promise.all(files.map(portal.upload)).then(function (uploaded) {
+			return uploaded.map(function (file) { return file.name; });
+		});
+	}
+
+	form.addEventListener("submit", function (event) {
+		event.preventDefault();
+		var errorBox = form.querySelector(".pt-error");
+		var button = form.querySelector("button[type=submit]");
+		portal.clearError(errorBox);
+		var restore = portal.busy(button, form.getAttribute("data-busy-label"));
+
+		uploadAttachments()
+			.then(function (attachments) {
+				return portal.call(form.getAttribute("data-method"), {
+					country: countrySelect.value,
+					city: citySelect.value,
+					data_center: dcSelect.value,
+					subject: form.elements.subject.value,
+					severity: form.elements.severity.value,
+					action_required: actionSelect.value,
+					action_other_details: form.elements.action_other_details.value,
+					target_equipment: form.elements.target_equipment.value,
+					description: form.elements.description.value,
+					engineers_required: form.elements.engineers_required.value,
+					external_reference: form.elements.external_reference.value,
+					preferred_slots: collectSlots(),
+					attachments: attachments
+				});
+			})
+			.then(function (ticket) {
+				window.location.href = "/portal/tickets/" + encodeURIComponent(ticket.name);
+			})
+			.catch(function (error) {
+				restore();
+				portal.showError(errorBox, error);
+			});
+	});
+})();
+</script>
+{% endblock %}

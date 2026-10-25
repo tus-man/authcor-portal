@@ -1,0 +1,72 @@
+{#-
+	Authcor customer portal base template -- PHASE-7-PORTAL.md section 3.
+
+	Standalone on purpose: it does not extend frappe's templates/web.html,
+	because section 3 asks for plain CSS in one stylesheet with no
+	framework, and web.html brings the website navbar and bootstrap with
+	it.
+
+	Two things every page that extends this must know.
+
+	1. Frappe's Jinja environment has autoescaping OFF (see
+	   frappe.utils.jinja._get_jenv -- frappe's own templates write `| e`
+	   by hand). Every value that originated with a user is escaped
+	   explicitly here and in the pages, and the `safe` filter is never
+	   used on one. TestPortalTemplateHygiene greps for it.
+	2. The context a page passes in is a hand-built projection, never a
+	   document. Nothing in this file or the pages it wraps can reach a
+	   field the customer is not meant to see, because no document is in
+	   scope to reach it from.
+-#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="robots" content="noindex, nofollow">
+	<title>{{ (title or _("Portal")) | e }} &middot; Authcor</title>
+	<link rel="stylesheet" href="/assets/authcor/css/portal.css">
+	{%- block head %}{% endblock %}
+</head>
+<body>
+	<a class="pt-skip" href="#pt-main">{{ _("Skip to content") }}</a>
+
+	<header class="pt-header">
+		<div class="pt-shell pt-header-inner">
+			{#- Wordmark rather than an image: there is no logo asset in the
+				repo yet. Drop one at /assets/authcor/images/logo.svg and
+				swap this anchor's contents for it. -#}
+			<a class="pt-logo" href="/portal/tickets">AUTH<span>COR</span></a>
+
+			<nav class="pt-nav" aria-label="{{ _("Portal") }}">
+				<a href="/portal/tickets"
+					{%- if portal_nav == "tickets" %} aria-current="page"{% endif %}>{{ _("Tickets") }}</a>
+				<a href="/portal/tickets/new"
+					{%- if portal_nav == "new-ticket" %} aria-current="page"{% endif %}>{{ _("Raise a ticket") }}</a>
+			</nav>
+
+			<div class="pt-ident">
+				<strong>{{ portal_customer_title | e }}</strong>
+				<a href="/logout">{{ _("Log out") }}</a>
+			</div>
+		</div>
+	</header>
+
+	<main class="pt-main" id="pt-main">
+		<div class="pt-shell">
+			{%- block portal_content %}{% endblock %}
+		</div>
+	</main>
+
+	<footer class="pt-footer">
+		{{ _("Authcor remote hands and logistics") }}
+	</footer>
+
+	{#- add_csrf_token replaces the comment below with a script assigning
+		frappe.csrf_token, so the namespace has to exist first. -#}
+	<script>window.frappe = window.frappe || {};</script>
+	<!-- csrf_token -->
+	<script src="/assets/authcor/js/portal.js"></script>
+	{%- block portal_script %}{% endblock %}
+</body>
+</html>

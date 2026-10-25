@@ -64,6 +64,23 @@ app_license = "mit"
 # 	"Role": "home_page"
 # }
 
+# Website routes
+# --------------
+# PHASE-7-PORTAL.md section 2: the portal's detail pages take a document
+# name in the path, which the www/ directory alone cannot express.
+#
+# The static /portal/tickets/new rule is not redundant. resolve_from_map
+# runs every path through one werkzeug Map, so without it "new" would match
+# the <name> rule and the raise-a-ticket page would be read as a request for
+# a ticket called "new". Werkzeug's matcher tries a state's static
+# transitions before its dynamic ones, so this holds regardless of the order
+# these two appear in.
+
+website_route_rules = [
+	{"from_route": "/portal/tickets/new", "to_route": "portal/tickets/new"},
+	{"from_route": "/portal/tickets/<name>", "to_route": "portal/ticket"},
+]
+
 # Generators
 # ----------
 

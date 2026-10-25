@@ -1,0 +1,454 @@
+/* Authcor customer portal -- PHASE-7-PORTAL.md section 3.
+ *
+ * One stylesheet, plain CSS, no framework. The palette is the brand's:
+ * --brand-red is sampled from the logo file, and buttons use the darker
+ * --action-red because white text on the logo red only reaches 4.38:1.
+ *
+ * Mobile matters here: customers check ticket status on a phone, so every
+ * table collapses to stacked cards below 768px via the data-label
+ * attributes the templates set on each cell.
+ */
+
+:root {
+	--brand-red: #ED1C24;
+	--action-red: #C41018;
+	--deep-red: #B3121A;
+	--ink: #1A1A1A;
+	--grey: #6B7280;
+	--border: #E5E7EB;
+	--surface: #F9FAFB;
+	--white: #FFFFFF;
+	--header: #141414;
+	--header-border: #2B2B2B;
+
+	--radius: 6px;
+	--shell: 1120px;
+	--font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+	margin: 0;
+	background: var(--surface);
+	color: var(--ink);
+	font: 15px/1.55 var(--font);
+}
+
+a { color: var(--action-red); }
+a:hover { color: var(--deep-red); }
+
+h1, h2, h3 { margin: 0 0 .5rem; line-height: 1.25; font-weight: 650; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.125rem; }
+h3 { font-size: .95rem; }
+
+.pt-shell {
+	width: 100%;
+	max-width: var(--shell);
+	margin: 0 auto;
+	padding: 0 1.25rem;
+}
+
+.pt-skip {
+	position: absolute;
+	left: -9999px;
+}
+.pt-skip:focus {
+	left: 1rem;
+	top: .5rem;
+	z-index: 10;
+	padding: .5rem .75rem;
+	background: var(--white);
+	border-radius: var(--radius);
+}
+
+/* -- header ------------------------------------------------------------ */
+
+.pt-header {
+	background: var(--header);
+	border-bottom: 3px solid var(--brand-red);
+	color: var(--white);
+}
+
+.pt-header-inner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .75rem 1.5rem;
+	padding-top: .85rem;
+	padding-bottom: .85rem;
+}
+
+.pt-logo {
+	display: inline-flex;
+	align-items: baseline;
+	gap: .1rem;
+	font-size: 1.2rem;
+	font-weight: 800;
+	letter-spacing: .09em;
+	color: var(--white);
+	text-decoration: none;
+}
+.pt-logo span { color: var(--brand-red); }
+.pt-logo:hover { color: var(--white); }
+
+.pt-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.1rem;
+	margin-right: auto;
+}
+.pt-nav a {
+	padding: .2rem 0;
+	color: #D6D6D6;
+	font-size: .9rem;
+	text-decoration: none;
+	border-bottom: 2px solid transparent;
+}
+.pt-nav a:hover { color: var(--white); }
+.pt-nav a[aria-current="page"] {
+	color: var(--white);
+	border-bottom-color: var(--brand-red);
+}
+
+.pt-ident {
+	display: flex;
+	align-items: center;
+	gap: .9rem;
+	font-size: .85rem;
+	color: #C9C9C9;
+}
+.pt-ident strong { color: var(--white); font-weight: 600; }
+.pt-ident a { color: #C9C9C9; }
+.pt-ident a:hover { color: var(--white); }
+
+/* -- page -------------------------------------------------------------- */
+
+.pt-main { padding: 1.75rem 1.25rem 3rem; }
+
+.pt-page-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: .75rem 1rem;
+	margin-bottom: 1.25rem;
+}
+.pt-page-head p { margin: .15rem 0 0; color: var(--grey); font-size: .9rem; }
+
+.pt-card {
+	background: var(--white);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 1.1rem 1.25rem;
+	margin-bottom: 1.25rem;
+}
+.pt-card > h2 { margin-bottom: .85rem; }
+.pt-card--flush { padding: 0; overflow: hidden; }
+
+.pt-muted { color: var(--grey); }
+.pt-small { font-size: .85rem; }
+.pt-empty { margin: 0; padding: 1.5rem 0; color: var(--grey); text-align: center; }
+
+.pt-grid-2 {
+	display: grid;
+	gap: 1.25rem;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* definition rows */
+
+.pt-facts {
+	display: grid;
+	gap: .6rem 1.5rem;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	margin: 0;
+}
+.pt-facts dt {
+	margin: 0;
+	color: var(--grey);
+	font-size: .75rem;
+	font-weight: 600;
+	letter-spacing: .05em;
+	text-transform: uppercase;
+}
+.pt-facts dd { margin: .15rem 0 0; overflow-wrap: anywhere; }
+
+.pt-prose { overflow-wrap: anywhere; }
+.pt-prose :first-child { margin-top: 0; }
+.pt-prose :last-child { margin-bottom: 0; }
+.pt-prose img { max-width: 100%; height: auto; }
+
+.pt-pre { margin: 0; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* -- badges ------------------------------------------------------------ */
+
+.pt-badge {
+	display: inline-block;
+	padding: .15rem .55rem;
+	border-radius: 999px;
+	font-size: .75rem;
+	font-weight: 650;
+	white-space: nowrap;
+}
+.pt-badge--amber  { background: #FEF3C7; color: #92400E; }
+.pt-badge--blue   { background: #DBEAFE; color: #1E40AF; }
+.pt-badge--active { background: #FEE2E2; color: var(--deep-red); }
+.pt-badge--green  { background: #D1FAE5; color: #065F46; }
+.pt-badge--grey   { background: #F3F4F6; color: #4B5563; }
+
+.pt-sev {
+	display: inline-block;
+	padding: .1rem .45rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	font-size: .75rem;
+	font-weight: 650;
+	color: var(--grey);
+}
+
+/* -- tables ------------------------------------------------------------ */
+
+.pt-table-wrap { overflow-x: auto; }
+
+.pt-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: .9rem;
+}
+.pt-table th,
+.pt-table td {
+	padding: .7rem .85rem;
+	text-align: left;
+	border-bottom: 1px solid var(--border);
+	vertical-align: top;
+}
+.pt-table th {
+	color: var(--grey);
+	font-size: .72rem;
+	font-weight: 650;
+	letter-spacing: .05em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+.pt-table tbody tr:last-child td { border-bottom: 0; }
+.pt-table tbody tr:hover { background: var(--surface); }
+.pt-table tfoot td {
+	font-weight: 650;
+	border-top: 2px solid var(--border);
+	border-bottom: 0;
+}
+.pt-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* -- timeline ---------------------------------------------------------- */
+
+.pt-timeline { margin: 0; padding: 0; list-style: none; }
+.pt-timeline li {
+	position: relative;
+	padding: 0 0 1rem 1.4rem;
+	border-left: 2px solid var(--border);
+}
+.pt-timeline li:last-child { padding-bottom: 0; border-left-color: transparent; }
+.pt-timeline li::before {
+	content: "";
+	position: absolute;
+	left: -5px;
+	top: .4rem;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--brand-red);
+}
+.pt-timeline time { display: block; color: var(--grey); font-size: .8rem; }
+
+/* -- forms ------------------------------------------------------------- */
+
+.pt-field { margin-bottom: 1rem; }
+.pt-field > label {
+	display: block;
+	margin-bottom: .3rem;
+	font-size: .8rem;
+	font-weight: 650;
+}
+.pt-hint { margin: .3rem 0 0; color: var(--grey); font-size: .8rem; }
+
+.pt-field input[type="text"],
+.pt-field input[type="file"],
+.pt-field input[type="number"],
+.pt-field select,
+.pt-field textarea {
+	width: 100%;
+	padding: .5rem .6rem;
+	font: inherit;
+	color: var(--ink);
+	background: var(--white);
+	border: 1px solid #D1D5DB;
+	border-radius: var(--radius);
+}
+.pt-field textarea { min-height: 7rem; resize: vertical; }
+.pt-field input:focus,
+.pt-field select:focus,
+.pt-field textarea:focus {
+	outline: 2px solid var(--action-red);
+	outline-offset: 1px;
+	border-color: var(--action-red);
+}
+.pt-field-row {
+	display: grid;
+	gap: 0 1rem;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.pt-btn {
+	display: inline-block;
+	padding: .5rem 1rem;
+	font: inherit;
+	font-weight: 600;
+	color: var(--white);
+	background: var(--action-red);
+	border: 1px solid var(--action-red);
+	border-radius: var(--radius);
+	cursor: pointer;
+	text-decoration: none;
+}
+.pt-btn:hover { color: var(--white); background: var(--deep-red); border-color: var(--deep-red); }
+.pt-btn[disabled] { opacity: .55; cursor: default; }
+.pt-btn--ghost {
+	color: var(--action-red);
+	background: var(--white);
+	border-color: #D1D5DB;
+}
+.pt-btn--ghost:hover { color: var(--deep-red); background: var(--surface); border-color: var(--grey); }
+
+.pt-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .6rem;
+	margin-top: 1rem;
+}
+
+.pt-filter {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: .6rem;
+}
+.pt-filter .pt-field { margin-bottom: 0; min-width: 11rem; }
+
+.pt-note {
+	margin: 0 0 1rem;
+	padding: .6rem .8rem;
+	border-left: 3px solid var(--brand-red);
+	background: #FFF5F5;
+	border-radius: 0 var(--radius) var(--radius) 0;
+	font-size: .88rem;
+}
+.pt-error {
+	margin: 0 0 1rem;
+	padding: .6rem .8rem;
+	border: 1px solid #FCA5A5;
+	background: #FEF2F2;
+	border-radius: var(--radius);
+	color: var(--deep-red);
+	font-size: .88rem;
+}
+.pt-error:empty, .pt-note:empty { display: none; }
+
+/* -- the preferred-slot grid ------------------------------------------- */
+
+.pt-slots { font-size: .88rem; }
+.pt-slots th, .pt-slots td { text-align: center; }
+.pt-slots th:first-child, .pt-slots td:first-child { text-align: left; white-space: nowrap; }
+.pt-slots input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--action-red); }
+
+/* -- proof of work ----------------------------------------------------- */
+
+.pt-proof {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+.pt-proof figure { margin: 0; }
+.pt-proof img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+.pt-proof figcaption { margin-top: .35rem; color: var(--grey); font-size: .8rem; }
+
+.pt-files { margin: 0; padding: 0; list-style: none; }
+.pt-files li { padding: .3rem 0; overflow-wrap: anywhere; }
+
+/* -- pagination -------------------------------------------------------- */
+
+.pt-pager {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+	margin-top: 1rem;
+}
+.pt-pager span { color: var(--grey); font-size: .85rem; }
+
+/* -- footer ------------------------------------------------------------ */
+
+.pt-footer {
+	padding: 1.5rem 1.25rem 2.5rem;
+	color: var(--grey);
+	font-size: .8rem;
+	text-align: center;
+}
+
+/* -- phone ------------------------------------------------------------- */
+
+@media (max-width: 767px) {
+	.pt-header-inner { align-items: flex-start; }
+	.pt-nav { order: 3; width: 100%; }
+	.pt-ident { order: 2; margin-left: auto; }
+
+	.pt-grid-2 { grid-template-columns: 1fr; }
+	.pt-field-row { grid-template-columns: 1fr; }
+
+	/* Tables become stacked cards. Every cell carries its own label, so
+	 * the header row can go away without the values losing meaning. */
+	.pt-table--stack thead { display: none; }
+	.pt-table--stack tbody tr,
+	.pt-table--stack tfoot tr {
+		display: block;
+		padding: .85rem 1rem;
+		border-bottom: 1px solid var(--border);
+	}
+	.pt-table--stack tbody tr:last-child { border-bottom: 0; }
+	.pt-table--stack tbody td,
+	.pt-table--stack tfoot td {
+		display: flex;
+		gap: 1rem;
+		justify-content: space-between;
+		padding: .2rem 0;
+		border: 0;
+		text-align: right;
+	}
+	.pt-table--stack tbody td::before,
+	.pt-table--stack tfoot td::before {
+		content: attr(data-label);
+		flex: 0 0 auto;
+		color: var(--grey);
+		font-size: .72rem;
+		font-weight: 650;
+		letter-spacing: .05em;
+		text-transform: uppercase;
+		text-align: left;
+	}
+	.pt-table--stack tbody td:empty { display: none; }
+	.pt-table--stack .pt-num { text-align: right; }
+
+	/* The slot grid keeps its header: the three band columns are the point
+	 * of it, and stacking them would lose the comparison. */
+	.pt-slots { min-width: 22rem; }
+}

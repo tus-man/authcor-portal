@@ -644,10 +644,17 @@ def _ensure_can_request_count_change(customer):
 	_ensure_customer_access(customer)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def increase_engineer_count(ticket, new_count):
 	"""Section 4. Increases need no approval -- direct edit to
-	engineers_required, under the ticket lock same as claiming."""
+	engineers_required, under the ticket lock same as claiming.
+
+	POST-only since PHASE-7-PORTAL.md: a whitelisted method with no
+	`methods` is reachable by GET, and frappe only validates the CSRF
+	token on unsafe HTTP methods (frappe.auth.HTTPRequest.
+	validate_csrf_token). Harmless while the only caller was a Desk client
+	script; not harmless now that the callers are client users on the
+	public internet."""
 	new_count = frappe.utils.cint(new_count)
 	customer = frappe.db.get_value("AC Smart Hands Request", ticket, "customer")
 	if customer is None:
@@ -668,7 +675,15 @@ def increase_engineer_count(ticket, new_count):
 		frappe.db.commit()
 		return doc
 
-	return _run_with_lock_retry(_attempt)
+	doc = _run_with_lock_retry(_attempt)
+	# A whitelisted method's return value is serialised into the response
+	# body with no field-level filtering -- as_dict() knows nothing about
+	# permlevel -- so returning the ticket to a client caller would hand
+	# them the eleven performance fields the portal templates are careful
+	# never to show. Strips whatever the caller may not read, and is a
+	# no-op for Administrator and for anyone holding permlevel 1.
+	doc.apply_fieldlevel_read_permissions()
+	return doc
 
 
 def recompute_time_expense_rollups(ticket_name):

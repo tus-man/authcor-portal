@@ -76,7 +76,11 @@ def build_ticket_closed_context(ticket_name):
 	expenses = frappe.get_all(
 		"AC Expense Claim",
 		filters={"ticket": ticket_name, "status": ["in", ("Submitted", "Reimbursed")]},
-		fields=["category", "description", "amount", "currency"],
+		# `receipt` is here for the portal's detail page (PHASE-7-PORTAL.md
+		# section 4: "Expense claims with amounts and receipts"), which
+		# renders from this same helper rather than growing a second
+		# permlevel-0 field list of its own. The closure email ignores it.
+		fields=["category", "description", "amount", "currency", "receipt"],
 	)
 
 	return {

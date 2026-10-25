@@ -65,7 +65,7 @@ class ACEngineerCountRequest(Document):
 			frappe.throw(_("A pending engineer count request already exists for this ticket."))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_count_request(ticket, requested_count, reason=None):
 	"""Section 8: the non-portal "Change Engineer Count" button's decrease
 	path (Admin/Ops L1 -- the customer-facing button is Phase 7). Client
@@ -101,7 +101,7 @@ def create_count_request(ticket, requested_count, reason=None):
 	return doc
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def reject_count_request(request, note=None):
 	"""Section 5. The ticket is untouched."""
 	_ensure_can_decide()
@@ -131,7 +131,7 @@ def reject_count_request(request, note=None):
 	return result
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def approve_count_request(request, engineers_to_remove, note=None):
 	"""Section 5. Re-validates request/ticket state (the ticket can have
 	moved to In Progress while the request sat pending), then removes the
@@ -205,7 +205,7 @@ def approve_count_request(request, engineers_to_remove, note=None):
 	return result
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def withdraw_count_request(request):
 	"""Section 6. The requesting customer's own users only, and only while
 	Pending -- lets them cancel without needing an admin to reject."""
