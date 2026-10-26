@@ -47,6 +47,7 @@ from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request impor
 	increase_engineer_count,
 )
 from authcor.notifications.context import build_ticket_closed_context
+from authcor.permissions import readable_response
 from authcor.portal import STATUS_BADGE_CLASS, get_portal_customer
 
 TICKET = "AC Smart Hands Request"
@@ -447,15 +448,9 @@ def create_portal_ticket(
 
 	_attach_uploaded_files(doc, attachments)
 
-	# A whitelisted method's return value is serialised into the response
-	# body with no field-level filtering -- as_dict() knows nothing about
-	# permlevel -- and before_insert has already stamped the performance
-	# block by this point. Strips whatever the caller may not read, which
-	# for a client role is the eleven internal fields; a no-op for anyone
-	# holding permlevel 1.
-	doc.apply_fieldlevel_read_permissions()
-
-	return doc
+	# before_insert has already stamped the performance block by this
+	# point, so the response has to be filtered -- see readable_response.
+	return readable_response(doc)
 
 
 # -- the detail page ------------------------------------------------------

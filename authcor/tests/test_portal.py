@@ -57,8 +57,37 @@ def _get_or_create(doctype, name, values):
 	return frappe.get_doc(doctype=doctype, **values).insert(ignore_permissions=True)
 
 
-def _make_city(name):
-	return _get_or_create("AC City", name, {"city_name": name, "country": "Singapore", "timezone": SGT})
+def _make_holiday_calendar(name, year=2026, holiday_dates=()):
+	"""An AC Holiday Calendar for `year`. A calendar that exists with zero
+	rows is a deliberate "no holidays" answer, not a missing one."""
+	return _get_or_create(
+		"AC Holiday Calendar",
+		name,
+		{"calendar_name": name, "year": year, "holidays": [{"holiday_date": d} for d in holiday_dates]},
+	)
+
+
+def _make_city(name, holiday_calendar=None):
+	"""No business hours and, by default, no holiday calendar -- none of
+	the portal pages reach the SLA calendar machinery, because every
+	ensure_sla_policy call in this module sets business_hours_only and both
+	next_business_day flags to 0, so ticket creation never consults either.
+
+	A class that creates an AC Time Entry is the exception and must pass a
+	calendar: derive_rate_category checks _is_holiday before anything else,
+	and a city with no calendar linked raises by design (_get_holiday_dates
+	-- a missing calendar is a configuration error, not a "no holidays"
+	answer)."""
+	return _get_or_create(
+		"AC City",
+		name,
+		{
+			"city_name": name,
+			"country": "Singapore",
+			"timezone": SGT,
+			"holiday_calendar": holiday_calendar,
+		},
+	)
 
 
 def _make_data_center(name, city):
@@ -365,7 +394,10 @@ class TestPortalTicketDetail(PortalPageMixin, IntegrationTestCase):
 			business_hours_only=0,
 			response_next_business_day=0,
 		)
-		cls.city = _make_city("Test Portal Detail City")
+		# The one portal class that creates an AC Time Entry, so the one
+		# that needs a holiday calendar on its city -- see _make_city.
+		cls.calendar = _make_holiday_calendar("Test Portal Detail Holiday Calendar 2026", 2026, [])
+		cls.city = _make_city("Test Portal Detail City", holiday_calendar=cls.calendar.name)
 		cls.dc = _make_data_center("Test Portal Detail DC", cls.city.name)
 		cls.engineer, cls.profile = _make_engineer("portal_detail_eng@authcor.test")
 
@@ -449,6 +481,16 @@ class TestPortalTicketDetail(PortalPageMixin, IntegrationTestCase):
 			self.render_raising("/portal/tickets/AC-SH-2026-99999")
 
 	def test_detail_renders_hours_but_no_rate(self):
+		# Guards the guard below. Asserting that the stored rate_category
+		# does not appear on the page is only meaningful while that value is
+		# not also a word the page prints for some other reason -- and
+		# "Standard" would be exactly that, since it is this customer's
+		# service level too. The fixture city has no business-hours rows, so
+		# every day classifies as Weekend; if that ever changes, this fails
+		# here with the reason rather than letting the leak check pass
+		# vacuously.
+		self.assertEqual(self.time_entry.rate_category, "Weekend")
+
 		frappe.set_user(self.user_a.name)
 		html = self.render(f"/portal/tickets/{self.ticket.name}")
 		self.assertIn("1.5", html)

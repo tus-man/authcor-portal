@@ -31,6 +31,7 @@ from authcor.notifications.recipients import (
 	resolve_ticket_created,
 	resolve_ticket_in_progress,
 )
+from authcor.permissions import readable_response
 
 
 def resolve_owning_slot(confirmed_date, confirmed_time):
@@ -535,7 +536,7 @@ def claim_ticket(ticket):
 		frappe.db.commit()
 		return doc
 
-	return _run_with_lock_retry(_attempt)
+	return readable_response(_run_with_lock_retry(_attempt))
 
 
 @frappe.whitelist()
@@ -550,7 +551,7 @@ def add_engineer(ticket, engineer):
 		frappe.db.commit()
 		return doc
 
-	return _run_with_lock_retry(_attempt)
+	return readable_response(_run_with_lock_retry(_attempt))
 
 
 @frappe.whitelist()
@@ -610,7 +611,7 @@ def remove_engineer(ticket, engineer):
 		context=engineer_removed_context(result.name, result.subject),
 		subject=_("[{0}] You have been removed -- {1}").format(result.name, result.subject),
 	)
-	return result
+	return readable_response(result)
 
 
 COUNT_CHANGE_BLOCKED_STATUSES = {"In Progress", "Completed", "Closed", "Cancelled"}
@@ -676,14 +677,7 @@ def increase_engineer_count(ticket, new_count):
 		return doc
 
 	doc = _run_with_lock_retry(_attempt)
-	# A whitelisted method's return value is serialised into the response
-	# body with no field-level filtering -- as_dict() knows nothing about
-	# permlevel -- so returning the ticket to a client caller would hand
-	# them the eleven performance fields the portal templates are careful
-	# never to show. Strips whatever the caller may not read, and is a
-	# no-op for Administrator and for anyone holding permlevel 1.
-	doc.apply_fieldlevel_read_permissions()
-	return doc
+	return readable_response(doc)
 
 
 def recompute_time_expense_rollups(ticket_name):

@@ -9,6 +9,7 @@ from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request impor
 	UNRESTRICTED_TICKET_ROLES,
 	recompute_time_expense_rollups,
 )
+from authcor.permissions import readable_response
 
 APPROVAL_ROLES = {"Operations L1 Authorizer", "Admin L1", "Admin L2"}
 CLIENT_ROLES = {"Client L1 Authorizer", "Client L2 Authorizer"}
@@ -141,7 +142,7 @@ def submit_claim(claim):
 	doc.status = "Submitted"
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
-	return doc
+	return readable_response(doc)
 
 
 @frappe.whitelist()
@@ -159,4 +160,4 @@ def mark_reimbursed(claim):
 
 	recompute_time_expense_rollups(doc.ticket)
 	frappe.db.commit()
-	return doc
+	return readable_response(doc)

@@ -18,6 +18,7 @@ from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request impor
 from authcor.notifications import notify
 from authcor.notifications.context import count_request_context, count_request_decided_context
 from authcor.notifications.recipients import resolve_count_request_decided, resolve_count_request_raised
+from authcor.permissions import readable_response
 
 
 def _ensure_can_decide():
@@ -98,7 +99,7 @@ def create_count_request(ticket, requested_count, reason=None):
 		context=count_request_context(doc),
 		subject=_("[{0}] Engineer count reduction requested").format(doc.ticket),
 	)
-	return doc
+	return readable_response(doc)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -128,7 +129,7 @@ def reject_count_request(request, note=None):
 		context=count_request_decided_context(result),
 		subject=_("[{0}] Engineer count reduction request rejected").format(result.ticket),
 	)
-	return result
+	return readable_response(result)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -202,7 +203,7 @@ def approve_count_request(request, engineers_to_remove, note=None):
 		context=count_request_decided_context(result),
 		subject=_("[{0}] Engineer count reduction request approved").format(result.ticket),
 	)
-	return result
+	return readable_response(result)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -221,4 +222,4 @@ def withdraw_count_request(request):
 		frappe.db.commit()
 		return req
 
-	return _run_with_lock_retry(_attempt)
+	return readable_response(_run_with_lock_retry(_attempt))

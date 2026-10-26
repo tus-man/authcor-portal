@@ -23,6 +23,7 @@ from authcor.notifications.recipients import (
 	resolve_shipment_created,
 	resolve_shipment_received,
 )
+from authcor.permissions import readable_response
 
 # Section 5. One small map in code, not on the DocType -- these change
 # occasionally and a code change is easier to review than a data edit.
@@ -87,7 +88,7 @@ def mark_received(shipment):
 	doc.status = "Received"
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
-	return doc
+	return readable_response(doc)
 
 
 @frappe.whitelist()
@@ -101,7 +102,7 @@ def close_shipment(shipment):
 	doc.status = "Closed"
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
-	return doc
+	return readable_response(doc)
 
 
 @frappe.whitelist()
@@ -114,7 +115,7 @@ def cancel_shipment(shipment):
 	doc.status = "Cancelled"
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
-	return doc
+	return readable_response(doc)
 
 
 class ACShipmentRequest(Document):
