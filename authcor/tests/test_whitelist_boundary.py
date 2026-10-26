@@ -183,8 +183,7 @@ class TestWhitelistReturnShapes(IntegrationTestCase):
 				"A whitelisted method's return value is serialised without permlevel "
 				"filtering. Wrap the return in readable_response() (authcor/permissions.py), "
 				"or -- if it provably cannot carry a document field -- add the call to "
-				"DOCUMENT_FREE_CALLS with the reason. Offending returns:\n  "
-				+ "\n  ".join(offenders)
+				"DOCUMENT_FREE_CALLS with the reason. Offending returns:\n  " + "\n  ".join(offenders)
 			),
 		)
 
@@ -261,9 +260,7 @@ class TestReadableResponse(IntegrationTestCase):
 		see _restricted_child_fields.
 		"""
 		found = {}
-		for doctype in frappe.get_all(
-			"DocType", filters={"module": "Authcor", "istable": 0}, pluck="name"
-		):
+		for doctype in frappe.get_all("DocType", filters={"module": "Authcor", "istable": 0}, pluck="name"):
 			restricted = _restricted_fields(doctype)
 			if restricted:
 				found[doctype] = restricted

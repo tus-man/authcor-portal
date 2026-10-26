@@ -103,7 +103,7 @@ website_route_rules = [
 # ------------
 
 # before_install = "authcor.install.before_install"
-# after_install = "authcor.install.after_install"
+after_install = "authcor.install.after_install"
 
 # Uninstallation
 # ------------
