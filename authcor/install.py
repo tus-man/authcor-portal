@@ -7,6 +7,7 @@ backfill sites installed before it existed.
 """
 
 import frappe
+from frappe import _
 
 from authcor.roles import sync_role_permissions
 from authcor.sla_policies import sync_sla_policies
@@ -60,7 +61,7 @@ def _ensure_default_outgoing_email_account():
 		# enabled, default-outgoing Email Account; on a production site that
 		# would silently become the account every outgoing mail is sent
 		# through.
-		frappe.throw("authcor.install.before_tests may only run in test mode.")
+		frappe.throw(_("authcor.install.before_tests may only run in test mode."))
 
 	if frappe.db.exists("Email Account", {"enable_outgoing": 1, "default_outgoing": 1}):
 		return

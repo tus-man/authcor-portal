@@ -778,7 +778,10 @@ def disclose_engineer_profile(ticket, engineer_profile):
 	engineer_name = frappe.db.get_value("User", engineer_profile.user, "full_name") or engineer_profile.user
 
 	subject = _("Engineer assigned to your ticket {0}").format(ticket.name)
-	message = frappe.render_template(
+	# Not template injection: the template is the module constant above, no
+	# part of it comes from a caller, and every placeholder in it escapes
+	# (enforced by test_notifications.TestEngineerDisclosureEmail).
+	message = frappe.render_template(  # nosemgrep
 		ENGINEER_DISCLOSURE_TEMPLATE,
 		{
 			"ticket_name": ticket.name,
@@ -1036,7 +1039,14 @@ class ACSmartHandsRequest(Document):
 			missing.append(_("a submitted time entry"))
 
 		if missing:
-			frappe.throw(_("Cannot close this ticket -- missing {0}.").format(_(" and ").join(missing)))
+			# The spaces are built here rather than translated with the word:
+			# a translatable string must not carry its own padding, or every
+			# translation has to reproduce it exactly (semgrep
+			# frappe-translation-trailing-spaces). comma_and() would read
+			# better from three items up, but it puts a comma before the
+			# "and", which changes this message for the two there are.
+			joined = f" {_('and')} ".join(missing)
+			frappe.throw(_("Cannot close this ticket -- missing {0}.").format(joined))
 
 	def stamp_completion(self):
 		"""(e) Stamp completed_on/completed_by the first time status becomes

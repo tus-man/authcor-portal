@@ -311,10 +311,10 @@ def get_service_area_tree(customer):
 	data: the cascade then needs no round trip, which is also why no
 	request on this page ever carries a customer."""
 	tree = []
-	for country in sorted(filter(None, get_allowed_countries(customer.name))):
+	for country in sorted(name for name in get_allowed_countries(customer.name) if name):
 		cities = []
-		for city in sorted(filter(None, get_allowed_cities(customer.name, country))):
-			data_centers = sorted(filter(None, get_allowed_data_centers(customer.name, city)))
+		for city in sorted(name for name in get_allowed_cities(customer.name, country) if name):
+			data_centers = sorted(name for name in get_allowed_data_centers(customer.name, city) if name)
 			if data_centers:
 				cities.append({"name": city, "data_centers": data_centers})
 		if cities:
