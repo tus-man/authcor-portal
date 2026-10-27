@@ -1,11 +1,11 @@
-"""Permlevel at the whitelisted-method boundary.
+"""The contracts a whitelisted method has to keep.
 
 A whitelisted method's return value is serialised with no permlevel
 filtering -- json_handler reaches for Document.__json__, which is
 as_dict(no_nulls=True), and as_dict knows nothing about permlevel. So
 every method that hands back a document has to filter for itself.
 
-Two classes, because there are two ways this breaks. TestReadableResponse
+Two classes cover that, because there are two ways it breaks. TestReadableResponse
 exercises the filtering itself against the real schema. TestWhitelistReturn
 Shapes is the generic one: rather than asserting twelve times that twelve
 known methods strip, it reads every @frappe.whitelist() function in the
@@ -15,6 +15,12 @@ later is covered the moment it is added -- and fails until someone has
 decided which of the two it is, which is the point. The failure is at
 worst a false positive on a safe return shape, and the fix for that is one
 justified line in DOCUMENT_FREE_CALLS.
+
+TestWhitelistHttpMethods is the same shape again for the HTTP verb, and
+for the same reason: frappe checks the CSRF token only for unsafe verbs,
+so a bare @frappe.whitelist() is a mutator one cross-site GET away from
+firing. Every method must say which verb it is, a GET one must not write,
+and a new method fails until someone has chosen.
 """
 
 import ast
@@ -391,3 +397,155 @@ class TestReadableResponse(IntegrationTestCase):
 		self.assertEqual(payload.get("subject"), "Kept")
 		self.assertEqual(payload.get("status"), "Open")
 		self.assertEqual(payload.get("doctype"), doctype)
+
+
+# --------------------------------------------------------------------------
+# The HTTP verb at the same boundary.
+#
+# frappe only checks the CSRF token for verbs in UNSAFE_HTTP_METHODS
+# (frappe/auth.py: validate_csrf_token returns early otherwise), so a
+# whitelisted method left with a bare @frappe.whitelist() is reachable by
+# GET with no token at all -- a logged-in session loading a hostile page
+# with <img src="/api/method/...claim_ticket?ticket=TKT-0001"> fires it.
+# The declaration is therefore default-deny here: every method says which
+# verb it is, and a new one fails this suite until someone has decided.
+# --------------------------------------------------------------------------
+
+ALLOWED_HTTP_METHODS = {"GET", "POST", "PUT", "DELETE"}
+
+# Calls that mean "this method writes", so it cannot be a GET. Attribute
+# calls are matched on the attribute alone (doc.save(), doc.insert()) --
+# the receiver is a local in every case and not worth resolving.
+WRITE_ATTRS = {"save", "insert", "submit", "cancel", "delete", "db_set"}
+WRITE_CALLS = {
+	"frappe.delete_doc",
+	"frappe.rename_doc",
+	"frappe.db.commit",
+	"frappe.db.delete",
+	"frappe.db.set_value",
+	"frappe.db.sql",
+}
+
+NOT_DECLARED = object()
+
+
+def _declared_http_methods(fn):
+	"""The literal list passed as methods= to @frappe.whitelist(), or
+	NOT_DECLARED. A non-literal (a name, a splat) counts as undeclared --
+	this test can only vouch for what it can read."""
+	for decorator in fn.decorator_list:
+		if not isinstance(decorator, ast.Call) or _dotted_name(decorator.func) != "frappe.whitelist":
+			continue
+		for keyword in decorator.keywords:
+			if keyword.arg != "methods":
+				continue
+			if not isinstance(keyword.value, ast.List):
+				return NOT_DECLARED
+			verbs = [v.value for v in keyword.value.elts if isinstance(v, ast.Constant)]
+			if len(verbs) != len(keyword.value.elts):
+				return NOT_DECLARED
+			return verbs
+	return NOT_DECLARED
+
+
+def _write_calls_in(fn):
+	"""Dotted names of the writing calls `fn` makes itself, nested helpers
+	included -- unlike the return scan, a write inside a retry closure is
+	still a write this method performs."""
+	found = []
+	for node in ast.walk(fn):
+		if not isinstance(node, ast.Call):
+			continue
+		if isinstance(node.func, ast.Attribute):
+			name = _dotted_name(node.func)
+			if name in WRITE_CALLS:
+				found.append(name)
+			elif node.func.attr in WRITE_ATTRS:
+				found.append(f".{node.func.attr}()")
+	return sorted(set(found))
+
+
+def _scan_whitelisted_http_methods(app_path):
+	"""[(path, lineno, fn_name, verbs_or_NOT_DECLARED, write_calls)] for
+	every whitelisted function in the app."""
+	rows = []
+	for root, dirs, files in os.walk(app_path):
+		dirs[:] = [d for d in dirs if d not in {"__pycache__", "node_modules"}]
+		for filename in sorted(files):
+			if not filename.endswith(".py"):
+				continue
+			path = os.path.join(root, filename)
+			with open(path, encoding="utf-8") as f:
+				tree = ast.parse(f.read(), path)
+			for node in ast.walk(tree):
+				if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+					continue
+				if not _is_whitelisted(node):
+					continue
+				rows.append(
+					(path, node.lineno, node.name, _declared_http_methods(node), _write_calls_in(node))
+				)
+	return rows
+
+
+class TestWhitelistHttpMethods(IntegrationTestCase):
+	def setUp(self):
+		self.app_path = frappe.get_app_path("authcor")
+		self.rows = _scan_whitelisted_http_methods(self.app_path)
+
+	def _where(self, path, lineno, name):
+		return f"{os.path.relpath(path, self.app_path)}:{lineno} {name}()"
+
+	def test_the_scan_found_the_whitelisted_methods(self):
+		"""A scan of nothing must not pass."""
+		found = {name for _, _, name, _, _ in self.rows}
+		self.assertTrue(found, msg=f"no whitelisted methods found under {self.app_path}")
+		missing = EXPECTED_WHITELISTED - found
+		self.assertFalse(missing, msg=f"scan missed known whitelisted methods: {sorted(missing)}")
+
+	def test_every_whitelisted_method_declares_its_http_methods(self):
+		offenders = [
+			self._where(path, lineno, name)
+			for path, lineno, name, verbs, _ in self.rows
+			if verbs is NOT_DECLARED
+		]
+		self.assertFalse(
+			offenders,
+			msg=(
+				"A bare @frappe.whitelist() is callable by GET, and frappe skips the "
+				'CSRF check on GET. Declare methods=["POST"] if the method writes, '
+				'methods=["GET"] if it only reads. Undeclared:\n  ' + "\n  ".join(offenders)
+			),
+		)
+
+	def test_declared_http_methods_are_verbs_frappe_enforces(self):
+		offenders = [
+			f"{self._where(path, lineno, name)} declares {verbs}"
+			for path, lineno, name, verbs, _ in self.rows
+			if verbs is not NOT_DECLARED and (not verbs or set(verbs) - ALLOWED_HTTP_METHODS)
+		]
+		self.assertFalse(
+			offenders,
+			msg=(
+				f"methods= must be a non-empty list of {sorted(ALLOWED_HTTP_METHODS)} -- "
+				"frappe matches request.method against it verbatim "
+				"(frappe/handler.py: is_valid_http_method).\n  " + "\n  ".join(offenders)
+			),
+		)
+
+	def test_a_get_method_does_not_write(self):
+		"""The declaration has to mean something: a method that saves,
+		deletes or commits cannot be the one declared read-only."""
+		offenders = [
+			f"{self._where(path, lineno, name)} declares GET but calls {', '.join(writes)}"
+			for path, lineno, name, verbs, writes in self.rows
+			if verbs is not NOT_DECLARED and set(verbs) <= {"GET"} and writes
+		]
+		self.assertFalse(
+			offenders,
+			msg=(
+				"A GET method carries no CSRF check, so it must not change anything. "
+				'Either it is really a mutator -- declare methods=["POST"] -- or the write '
+				"belongs elsewhere.\n  " + "\n  ".join(offenders)
+			),
+		)

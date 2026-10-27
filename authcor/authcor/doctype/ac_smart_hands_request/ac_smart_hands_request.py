@@ -366,7 +366,7 @@ def _ensure_customer_access(customer):
 		frappe.throw(_("Not permitted to access this customer."), frappe.PermissionError)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def get_allowed_countries(customer):
 	_ensure_customer_access(customer)
 	return frappe.get_all(
@@ -377,7 +377,7 @@ def get_allowed_countries(customer):
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def get_allowed_cities(customer, country):
 	_ensure_customer_access(customer)
 	return frappe.get_all(
@@ -388,7 +388,7 @@ def get_allowed_cities(customer, country):
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def get_allowed_data_centers(customer, city):
 	_ensure_customer_access(customer)
 	rows = frappe.get_all(
@@ -524,7 +524,7 @@ def _run_with_lock_retry(fn):
 	raise last_error
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def claim_ticket(ticket):
 	"""Section 3. Self-claim by the calling engineer."""
 	engineer_user = frappe.session.user
@@ -543,7 +543,7 @@ def claim_ticket(ticket):
 	return readable_response(_run_with_lock_retry(_attempt))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def add_engineer(ticket, engineer):
 	"""Section 4. Admin/Ops L1/L2 assignment, bypassing the claim queue --
 	but not the authorisation/capacity/FIN checks, which still apply."""
@@ -558,7 +558,7 @@ def add_engineer(ticket, engineer):
 	return readable_response(_run_with_lock_retry(_attempt))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def remove_engineer(ticket, engineer):
 	"""Section 4. If the removed engineer was Primary and Support
 	engineers remain, promote the earliest-claimed Support -- otherwise a

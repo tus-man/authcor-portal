@@ -130,7 +130,7 @@ class ACExpenseClaim(Document):
 			)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def submit_claim(claim):
 	"""Section 3. Engineer creates Draft, then submits it themselves."""
 	doc = frappe.get_doc("AC Expense Claim", claim)
@@ -143,7 +143,7 @@ def submit_claim(claim):
 	return readable_response(doc)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def mark_reimbursed(claim):
 	"""Section 3, post-demo: approval is gone -- a claim reaches the
 	customer as soon as it's Submitted with a receipt, so this is the one

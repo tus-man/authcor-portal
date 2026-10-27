@@ -50,7 +50,7 @@ def build_tracking_url(carrier, tracking_number):
 	return template.format(tracking_number=quote(tracking_number, safe=""))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def get_tracking_url(carrier, tracking_number):
 	return build_tracking_url(carrier, tracking_number)
 
@@ -75,7 +75,7 @@ def _ensure_can_manage_shipment():
 		frappe.throw(_("You are not permitted to update this shipment's status."), frappe.PermissionError)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def mark_received(shipment):
 	"""Section 3: Open -> Received. Stamps actual_delivery/received_by/
 	stored_on and requires receipt proof -- all enforced in validate() so
@@ -91,7 +91,7 @@ def mark_received(shipment):
 	return readable_response(doc)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def close_shipment(shipment):
 	"""Section 3: Received -> Closed. storage_location-if-warehoused is
 	enforced in validate()."""
@@ -105,7 +105,7 @@ def close_shipment(shipment):
 	return readable_response(doc)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def cancel_shipment(shipment):
 	"""Section 3: Cancelled is reachable any time before Closed."""
 	_ensure_can_manage_shipment()

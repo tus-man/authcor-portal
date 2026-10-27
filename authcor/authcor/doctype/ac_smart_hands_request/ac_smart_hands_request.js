@@ -278,6 +278,7 @@ function refresh_allowed_countries(frm) {
 
 	frappe.call({
 		method: "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.get_allowed_countries",
+		type: "GET",
 		args: { customer: frm.doc.customer },
 		callback(r) {
 			frm.allowed_countries = r.message || [];
@@ -291,6 +292,7 @@ function refresh_allowed_cities(frm) {
 
 	frappe.call({
 		method: "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.get_allowed_cities",
+		type: "GET",
 		args: { customer: frm.doc.customer, country: frm.doc.country },
 		callback(r) {
 			frm.allowed_cities = r.message || [];
@@ -304,6 +306,7 @@ function refresh_allowed_data_centers(frm) {
 
 	frappe.call({
 		method: "authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request.get_allowed_data_centers",
+		type: "GET",
 		args: { customer: frm.doc.customer, city: frm.doc.city },
 		callback(r) {
 			frm.allowed_data_centers = r.message || [];
