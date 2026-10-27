@@ -393,19 +393,19 @@ def _attach_uploaded_files(doc, attachments):
 
 @frappe.whitelist(methods=["POST"])
 def create_portal_ticket(
-	country=None,
-	city=None,
-	data_center=None,
-	subject=None,
-	description=None,
-	severity=None,
-	action_required=None,
-	action_other_details=None,
-	target_equipment=None,
-	engineers_required=None,
-	external_reference=None,
-	preferred_slots=None,
-	attachments=None,
+	country: str | None = None,
+	city: str | None = None,
+	data_center: str | None = None,
+	subject: str | None = None,
+	description: str | None = None,
+	severity: str | None = None,
+	action_required: str | None = None,
+	action_other_details: str | None = None,
+	target_equipment: str | None = None,
+	engineers_required: int | str | None = None,
+	external_reference: str | None = None,
+	preferred_slots: str | list | None = None,
+	attachments: str | list | None = None,
 ):
 	"""Section 4/6: build the document server-side from a declared
 	parameter list.
@@ -609,7 +609,7 @@ def _build_work_summary(ticket_name):
 
 
 @frappe.whitelist(methods=["POST"])
-def amend_preferred_slots(ticket=None, slots=None):
+def amend_preferred_slots(ticket: str | None = None, slots: str | list | None = None):
 	"""Section 4: amend preferred slots while unconfirmed.
 
 	Takes the ticket lock the same way claim_ticket and
@@ -652,7 +652,7 @@ def amend_preferred_slots(ticket=None, slots=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_dc_access_ticket_number(ticket=None, dc_access_ticket_number=None):
+def set_dc_access_ticket_number(ticket: str | None = None, dc_access_ticket_number: str | None = None):
 	"""Section 4: enter the DC access ticket number once engineer details
 	have been released -- the number the data centre issues back once the
 	customer has filed the access request with the engineer's details."""

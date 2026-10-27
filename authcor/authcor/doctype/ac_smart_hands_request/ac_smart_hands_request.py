@@ -369,7 +369,7 @@ def _ensure_customer_access(customer):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_allowed_countries(customer):
+def get_allowed_countries(customer: str):
 	_ensure_customer_access(customer)
 	return frappe.get_all(
 		"AC Customer Service Area",
@@ -380,7 +380,7 @@ def get_allowed_countries(customer):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_allowed_cities(customer, country):
+def get_allowed_cities(customer: str, country: str):
 	_ensure_customer_access(customer)
 	return frappe.get_all(
 		"AC Customer Service Area",
@@ -391,7 +391,7 @@ def get_allowed_cities(customer, country):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_allowed_data_centers(customer, city):
+def get_allowed_data_centers(customer: str, city: str):
 	_ensure_customer_access(customer)
 	rows = frappe.get_all(
 		"AC Customer Service Area",
@@ -527,7 +527,7 @@ def _run_with_lock_retry(fn):
 
 
 @frappe.whitelist(methods=["POST"])
-def claim_ticket(ticket):
+def claim_ticket(ticket: str):
 	"""Section 3. Self-claim by the calling engineer."""
 	engineer_user = frappe.session.user
 	# Step 1: fail fast, before ever taking the row lock, on a caller who
@@ -548,7 +548,7 @@ def claim_ticket(ticket):
 
 
 @frappe.whitelist(methods=["POST"])
-def add_engineer(ticket, engineer):
+def add_engineer(ticket: str, engineer: str):
 	"""Section 4. Admin/Ops L1/L2 assignment, bypassing the claim queue --
 	but not the authorisation/capacity/FIN checks, which still apply."""
 	_ensure_can_manage_assignments()
@@ -565,7 +565,7 @@ def add_engineer(ticket, engineer):
 
 
 @frappe.whitelist(methods=["POST"])
-def remove_engineer(ticket, engineer):
+def remove_engineer(ticket: str, engineer: str):
 	"""Section 4. If the removed engineer was Primary and Support
 	engineers remain, promote the earliest-claimed Support -- otherwise a
 	ticket can end up with only Support engineers and no owner. Status is
@@ -658,7 +658,7 @@ def _ensure_can_request_count_change(customer):
 
 
 @frappe.whitelist(methods=["POST"])
-def increase_engineer_count(ticket, new_count):
+def increase_engineer_count(ticket: str, new_count: int | str):
 	"""Section 4. Increases need no approval -- direct edit to
 	engineers_required, under the ticket lock same as claiming.
 

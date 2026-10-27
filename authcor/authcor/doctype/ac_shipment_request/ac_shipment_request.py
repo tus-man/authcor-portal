@@ -51,7 +51,7 @@ def build_tracking_url(carrier, tracking_number):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_tracking_url(carrier, tracking_number):
+def get_tracking_url(carrier: str, tracking_number: str):
 	return build_tracking_url(carrier, tracking_number)
 
 
@@ -76,7 +76,7 @@ def _ensure_can_manage_shipment():
 
 
 @frappe.whitelist(methods=["POST"])
-def mark_received(shipment):
+def mark_received(shipment: str):
 	"""Section 3: Open -> Received. Stamps actual_delivery/received_by/
 	stored_on and requires receipt proof -- all enforced in validate() so
 	this whitelisted entry point can't drift from any other write path
@@ -94,7 +94,7 @@ def mark_received(shipment):
 
 
 @frappe.whitelist(methods=["POST"])
-def close_shipment(shipment):
+def close_shipment(shipment: str):
 	"""Section 3: Received -> Closed. storage_location-if-warehoused is
 	enforced in validate()."""
 	_ensure_can_manage_shipment()
@@ -110,7 +110,7 @@ def close_shipment(shipment):
 
 
 @frappe.whitelist(methods=["POST"])
-def cancel_shipment(shipment):
+def cancel_shipment(shipment: str):
 	"""Section 3: Cancelled is reachable any time before Closed."""
 	_ensure_can_manage_shipment()
 	doc = frappe.get_doc("AC Shipment Request", shipment)
