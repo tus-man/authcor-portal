@@ -121,4 +121,21 @@ jobs:
         env:
           TYPE: server
 
-        
+      # Advisory, never blocking: every package here is a Frappe pin, so a
+      # finding is not something this repo can fix in the pull request that
+      # surfaces it. See .github/workflows/linter.yml for how it is acted
+      # on. Audits the bench this job actually built -- the app declares no
+      # dependencies of its own, so auditing the app would audit nothing.
+      # Runs last, and if: always(), so it neither delays test feedback nor
+      # disappears when a test fails.
+      - name: Audit installed dependencies (advisory)
+        if: always()
+        continue-on-error: true
+        working-directory: /home/runner/frappe-bench
+        run: |
+          pip install pip-audit
+          ./env/bin/python -m pip freeze --exclude-editable > /tmp/bench-requirements.txt
+          echo "### Dependency audit (advisory)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          pip-audit --desc off -f markdown --progress-spinner=off -r /tmp/bench-requirements.txt \
+            | tee -a "$GITHUB_STEP_SUMMARY"

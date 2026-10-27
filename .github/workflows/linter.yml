@@ -33,19 +33,32 @@ jobs:
           pip install semgrep
           semgrep ci --config ./frappe-semgrep-rules/rules --config r/python.lang.correctness
 
-# There is no dependency-audit job on purpose.
+# The dependency audit lives in .github/workflows/ci.yml, not here, and it
+# is advisory.
 #
-# This app declares no runtime dependencies -- frappe is installed and
-# pinned by bench, which is why `pip-audit .` resolved zero packages and
-# reported "No known vulnerabilities found" on every run it would ever
-# make. Pointing it at a built bench's environment instead is meaningful
-# but not actionable here: that audit reports 163 advisories across 15
-# packages (pillow, pypdf, pyjwt, gitpython, cryptography, urllib3 and
-# friends), every one of them a frappe pin that this repo cannot raise
-# without upgrading frappe. A gate that is red on day one and can only be
-# fixed upstream gets switched off or ignored, and an ignore list of 163
-# IDs would hide the next one rather than surface it.
+# It has to run against a built bench: this app declares no runtime
+# dependencies -- the one line in pyproject.toml is
+# `# "frappe~=16.0.0" # Installed and managed by bench.` -- so
+# `pip-audit .` resolves zero packages and reports "No known
+# vulnerabilities found" whatever the state of the world. The CI job
+# already builds a bench, so the audit runs there, over the 129 packages
+# that bench actually installed.
 #
-# Auditing frappe's dependencies is frappe's job. If this app ever takes
-# on a dependency of its own, put `pip-audit --desc on .` back: at that
-# point it has something to check.
+# It does not fail the build, because every finding belongs to Frappe
+# rather than to this repo: at the time it was wired up, the bench
+# environment carried 163 advisories across 15 packages (pillow, pypdf,
+# pyjwt, gitpython, cryptography, sqlparse, weasyprint, urllib3, bleach,
+# certifi, brotli, filelock, oauthlib, pdfkit, werkzeug), none of them
+# raisable without upgrading Frappe. A gate that is red from its first run
+# and only fixable upstream gets switched off; a report that is read gets
+# acted on.
+#
+# Where it gets acted on: before the VPS deploy, Frappe is updated to the
+# latest v16 patch release and the audit is re-run. Most of these clear on
+# that update. Whatever is still outstanding afterwards is a deliberate
+# decision -- accepted, mitigated, or a reason to hold the deploy -- taken
+# with the list in hand, not waved through by a workflow.
+#
+# If this app ever takes on a dependency of its own, `pip-audit .` becomes
+# meaningful here too and is worth adding back as a blocking check: that
+# one the repo can actually fix.
