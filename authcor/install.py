@@ -9,12 +9,16 @@ backfill sites installed before it existed.
 import frappe
 
 from authcor.roles import sync_role_permissions
+from authcor.sla_policies import sync_sla_policies
 
 TEST_EMAIL_ACCOUNT = "Authcor Test Outgoing"
 
 
 def after_install():
 	sync_role_permissions()
+	# Without these, every ticket insert on the new site throws: a ticket
+	# resolves a policy in before_insert. Create-only -- see sla_policies.
+	sync_sla_policies()
 
 
 def before_tests():
@@ -29,25 +33,25 @@ def before_tests():
 
 def _ensure_default_outgoing_email_account():
 	"""Give the test site something for frappe.sendmail to resolve a sender
-	    against.
+	against.
 
-	    Notifications are delivered inline in tests (authcor/tests/__init__.py),
-	    so every ticket insert reaches channels.send_email -> frappe.sendmail,
-	    which resolves the outgoing account while *building* the queue row:
-	    QueueBuilder.sender -> EmailAccount.find_outgoing(_raise_error=True),
-	    with no test-mode shortcut on that path. With no default outgoing
-	    account it raises OutgoingEmailError, _deliver catches it and logs the
-	    notification Failed instead of Sent -- which is a real failure of
-	    test_notifications' Sent assertions and a confusing one, since nothing
-	    in the app is broken.
+	Notifications are delivered inline in tests (authcor/tests/__init__.py),
+	so every ticket insert reaches channels.send_email -> frappe.sendmail,
+	which resolves the outgoing account while *building* the queue row:
+	QueueBuilder.sender -> EmailAccount.find_outgoing(_raise_error=True),
+	with no test-mode shortcut on that path. With no default outgoing
+	account it raises OutgoingEmailError, _deliver catches it and logs the
+	notification Failed instead of Sent -- which is a real failure of
+	test_notifications' Sent assertions and a confusing one, since nothing
+	in the app is broken.
 
-	    Nothing is ever sent. smtp_server points at localhost and no test opens
-	    a socket; Email Account.validate returns early under frappe.in_test
-	    before it would try to connect or demand a password.
+	Nothing is ever sent. smtp_server points at localhost and no test opens
+	a socket; Email Account.validate returns early under frappe.in_test
+	before it would try to connect or demand a password.
 
 	A no-op on any site that already has a default outgoing account -- a dev
-	    site with a real Mailpit account keeps it, and the suite does not quietly
-	    take over which account outgoing mail goes through.
+	site with a real Mailpit account keeps it, and the suite does not quietly
+	take over which account outgoing mail goes through.
 	"""
 	if not frappe.in_test:
 		# Refuse rather than trust the caller. This function creates an

@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 authcor.patches.sync_role_permissions
 authcor.patches.grant_admin_access_to_config_doctypes
+authcor.patches.create_sla_policies
