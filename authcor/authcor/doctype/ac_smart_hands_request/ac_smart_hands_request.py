@@ -117,7 +117,7 @@ def _next_working_period_start(local_date, business_hours, city_doc, tz, holiday
 	"tomorrow" after a day's capacity is used up, and to answer
 	next_business_day_end directly."""
 	d = local_date
-	for _ in range(MAX_WORKING_DAY_SEARCH):
+	for _step in range(MAX_WORKING_DAY_SEARCH):
 		window = business_hours.get(WEEKDAY_NAMES[d.weekday()])
 		if window and not _is_holiday(city_doc, d, holiday_cache):
 			return datetime.datetime.combine(d, window[0], tzinfo=tz)
