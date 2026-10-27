@@ -114,7 +114,9 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 		return True
 
 	return bool(
-		frappe.db.sql(
+		# {condition} is not caller input: get_visibility_condition builds the fragment,
+		# and the only value it interpolates goes through frappe.db.escape first.
+		frappe.db.sql(  # nosemgrep
 			f"select name from `tabAC Time Entry` where name = %s and {condition}",
 			(doc.name,),
 		)

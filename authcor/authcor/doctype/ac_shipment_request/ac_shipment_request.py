@@ -87,7 +87,9 @@ def mark_received(shipment):
 		frappe.throw(_("Only an Open shipment can be marked Received."))
 	doc.status = "Received"
 	doc.save(ignore_permissions=True)
-	frappe.db.commit()
+	# The status transition is the whole action, made durable here rather than left to
+	# the request teardown -- these methods are called directly as well as over HTTP.
+	frappe.db.commit()  # nosemgrep
 	return readable_response(doc)
 
 
@@ -101,7 +103,9 @@ def close_shipment(shipment):
 		frappe.throw(_("Only a Received shipment can be Closed."))
 	doc.status = "Closed"
 	doc.save(ignore_permissions=True)
-	frappe.db.commit()
+	# The status transition is the whole action, made durable here rather than left to
+	# the request teardown -- these methods are called directly as well as over HTTP.
+	frappe.db.commit()  # nosemgrep
 	return readable_response(doc)
 
 
@@ -114,7 +118,9 @@ def cancel_shipment(shipment):
 		frappe.throw(_("A Closed shipment cannot be Cancelled."))
 	doc.status = "Cancelled"
 	doc.save(ignore_permissions=True)
-	frappe.db.commit()
+	# The status transition is the whole action, made durable here rather than left to
+	# the request teardown -- these methods are called directly as well as over HTTP.
+	frappe.db.commit()  # nosemgrep
 	return readable_response(doc)
 
 

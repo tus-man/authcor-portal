@@ -638,7 +638,9 @@ def amend_preferred_slots(ticket=None, slots=None):
 
 		doc.set("preferred_slots", rows)
 		doc.save(ignore_permissions=True)
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return doc
 
 	doc = _run_with_lock_retry(_attempt)
@@ -678,7 +680,9 @@ def set_dc_access_ticket_number(ticket=None, dc_access_ticket_number=None):
 
 		doc.dc_access_ticket_number = number
 		doc.save(ignore_permissions=True)
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return doc
 
 	doc = _run_with_lock_retry(_attempt)

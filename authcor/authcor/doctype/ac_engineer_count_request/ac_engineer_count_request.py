@@ -89,7 +89,9 @@ def create_count_request(ticket, requested_count, reason=None):
 		reason=reason,
 	)
 	doc.insert(ignore_permissions=True)
-	frappe.db.commit()
+	# Committed before notify(), so no recipient is ever told about a request
+	# that a later failure would have rolled back.
+	frappe.db.commit()  # nosemgrep
 
 	notify(
 		event_key="count_request_raised",
@@ -117,7 +119,9 @@ def reject_count_request(request, note=None):
 		req.decided_on = now_datetime()
 		req.decision_note = note
 		req.save(ignore_permissions=True)
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return req
 
 	result = _run_with_lock_retry(_attempt)
@@ -191,7 +195,9 @@ def approve_count_request(request, engineers_to_remove, note=None):
 		req.decision_note = note
 		req.save(ignore_permissions=True)
 
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return req
 
 	result = _run_with_lock_retry(_finalize)
@@ -219,7 +225,9 @@ def withdraw_count_request(request):
 
 		req.status = "Withdrawn"
 		req.save(ignore_permissions=True)
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return req
 
 	return readable_response(_run_with_lock_retry(_attempt))

@@ -28,7 +28,9 @@ def before_tests():
 	business existing on a production site.
 	"""
 	_ensure_default_outgoing_email_account()
-	frappe.db.commit()
+	# The test runner carries on in a new transaction -- an uncommitted Email
+	# Account would be gone before the first test asked for a sender.
+	frappe.db.commit()  # nosemgrep
 
 
 def _ensure_default_outgoing_email_account():

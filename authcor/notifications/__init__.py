@@ -192,7 +192,9 @@ def _write_log(
 		error=error,
 		sent_on=now_datetime() if status == "Sent" else None,
 	).insert(ignore_permissions=True, ignore_links=True)
-	frappe.db.commit()
+	# An audit row has to outlive its caller: a later failure in notify() must
+	# not take the log of what already went out with it.
+	frappe.db.commit()  # nosemgrep
 
 
 # Registers "Email" into CHANNEL_SENDERS. Imported at the bottom, not the

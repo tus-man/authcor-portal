@@ -71,7 +71,9 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 		return True
 
 	return bool(
-		frappe.db.sql(
+		# {condition} is not caller input: get_visibility_condition builds the fragment,
+		# and the only value it interpolates goes through frappe.db.escape first.
+		frappe.db.sql(  # nosemgrep
 			f"select name from `tabAC Expense Claim` where name = %s and {condition}",
 			(doc.name,),
 		)
@@ -139,7 +141,9 @@ def submit_claim(claim):
 		frappe.throw(_("Only a Draft claim can be submitted."))
 	doc.status = "Submitted"
 	doc.save(ignore_permissions=True)
-	frappe.db.commit()
+	# The status transition is the whole action, made durable here rather than left to
+	# the request teardown -- these methods are called directly as well as over HTTP.
+	frappe.db.commit()  # nosemgrep
 	return readable_response(doc)
 
 
@@ -157,5 +161,7 @@ def mark_reimbursed(claim):
 	doc.save(ignore_permissions=True)
 
 	recompute_time_expense_rollups(doc.ticket)
-	frappe.db.commit()
+	# The status transition is the whole action, made durable here rather than left to
+	# the request teardown -- these methods are called directly as well as over HTTP.
+	frappe.db.commit()  # nosemgrep
 	return readable_response(doc)

@@ -45,7 +45,9 @@ def check_sla_breaches():
 		"No",
 	)
 
-	frappe.db.commit()
+	# A scheduled job owns its own transaction, and these breach verdicts are
+	# its only output.
+	frappe.db.commit()  # nosemgrep
 
 	evaluate_escalation_rules()
 

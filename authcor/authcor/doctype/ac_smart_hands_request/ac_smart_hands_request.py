@@ -354,7 +354,9 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 	# document, rather than re-expressing the rule in Python -- that's
 	# what guarantees the two hooks can't disagree.
 	return bool(
-		frappe.db.sql(
+		# {condition} is not caller input: get_visibility_condition builds the fragment,
+		# and the only value it interpolates goes through frappe.db.escape first.
+		frappe.db.sql(  # nosemgrep
 			f"select name from `tabAC Smart Hands Request` where name = %s and {condition}",
 			(doc.name,),
 		)
@@ -537,7 +539,9 @@ def claim_ticket(ticket):
 		# assigned_engineers -- never read before the lock.
 		doc = frappe.get_doc("AC Smart Hands Request", ticket, for_update=True)
 		doc = _assign_engineer(doc, engineer_user, added_by=engineer_user)
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return doc
 
 	return readable_response(_run_with_lock_retry(_attempt))
@@ -552,7 +556,9 @@ def add_engineer(ticket, engineer):
 	def _attempt():
 		doc = frappe.get_doc("AC Smart Hands Request", ticket, for_update=True)
 		doc = _assign_engineer(doc, engineer, added_by=frappe.session.user)
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return doc
 
 	return readable_response(_run_with_lock_retry(_attempt))
@@ -599,7 +605,9 @@ def remove_engineer(ticket, engineer):
 				doc.status = "Partially Claimed"
 
 		doc.save(ignore_permissions=True)
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return doc
 
 	result = _run_with_lock_retry(_attempt)
@@ -677,7 +685,9 @@ def increase_engineer_count(ticket, new_count):
 		doc.engineers_required = new_count
 		_recompute_pool_status(doc)
 		doc.save(ignore_permissions=True)
-		frappe.db.commit()
+		# Commits inside the lock window on purpose: _run_with_lock_retry rolls back and
+		# re-acquires on a deadlock, so an attempt either commits or leaves nothing behind.
+		frappe.db.commit()  # nosemgrep
 		return doc
 
 	doc = _run_with_lock_retry(_attempt)
