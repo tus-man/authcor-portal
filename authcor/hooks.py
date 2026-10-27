@@ -188,7 +188,7 @@ scheduler_events = {
 # Testing
 # -------
 
-# before_tests = "authcor.install.before_tests"
+before_tests = "authcor.install.before_tests"
 
 # Extend DocType Class
 # ------------------------------
