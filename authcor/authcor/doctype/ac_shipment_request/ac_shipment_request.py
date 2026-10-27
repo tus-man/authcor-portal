@@ -210,7 +210,9 @@ class ACShipmentRequest(Document):
 		closes with no location at all."""
 		if self.status == "Closed" and self.store_in_warehouse and not self.storage_location:
 			frappe.throw(
-				_("Storage Location is required for a shipment stored in the warehouse before it can be Closed.")
+				_(
+					"Storage Location is required for a shipment stored in the warehouse before it can be Closed."
+				)
 			)
 
 	def validate_cancellation(self):
@@ -240,7 +242,9 @@ class ACShipmentRequest(Document):
 			self.actual_delivery = now_datetime()
 
 		if not self.received_by:
-			engineer_profile = frappe.db.get_value("AC Engineer Profile", {"user": frappe.session.user}, "name")
+			engineer_profile = frappe.db.get_value(
+				"AC Engineer Profile", {"user": frappe.session.user}, "name"
+			)
 			if engineer_profile:
 				self.received_by = engineer_profile
 

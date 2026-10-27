@@ -100,9 +100,7 @@ class TestTicketVisibilityPredicate(IntegrationTestCase):
 		cls.city = _make_city("Test Visibility City")
 		cls.dc = _make_data_center("Test Visibility DC", cls.city.name)
 
-		cls.engineer_user = _make_user(
-			"vis_engineer@authcor.test", roles=["Operations L2 Authorizer"]
-		)
+		cls.engineer_user = _make_user("vis_engineer@authcor.test", roles=["Operations L2 Authorizer"])
 		cls.other_engineer_user = _make_user(
 			"vis_other_engineer@authcor.test", roles=["Operations L2 Authorizer"]
 		)

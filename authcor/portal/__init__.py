@@ -67,9 +67,7 @@ def get_portal_customer(user=None):
 	)
 
 	if not customers:
-		raise frappe.PermissionError(
-			_("{0} is not an active portal user for any customer.").format(user)
-		)
+		raise frappe.PermissionError(_("{0} is not an active portal user for any customer.").format(user))
 
 	if len(customers) > 1:
 		raise frappe.PermissionError(

@@ -37,7 +37,9 @@ def get_pool_engineers(customer):
 	engineers = [row.engineer for row in frappe.get_cached_doc("AC Customer", customer).authorised_engineers]
 	if not engineers:
 		return []
-	return frappe.get_all("AC Engineer Profile", filters={"user": ["in", engineers], "is_active": 1}, pluck="user")
+	return frappe.get_all(
+		"AC Engineer Profile", filters={"user": ["in", engineers], "is_active": 1}, pluck="user"
+	)
 
 
 # -- Ticket events ------------------------------------------------------

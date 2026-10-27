@@ -167,10 +167,14 @@ def _deliver(event_key, template, reference_doctype, reference_name, channel, re
 			event_key, reference_doctype, reference_name, channel, recipient, status="Sent", address=address
 		)
 	except Exception as e:
-		_write_log(event_key, reference_doctype, reference_name, channel, recipient, status="Failed", error=str(e))
+		_write_log(
+			event_key, reference_doctype, reference_name, channel, recipient, status="Failed", error=str(e)
+		)
 
 
-def _write_log(event_key, reference_doctype, reference_name, channel, recipient, status, address=None, error=None):
+def _write_log(
+	event_key, reference_doctype, reference_name, channel, recipient, status, address=None, error=None
+):
 	"""ignore_links=True: an audit log's whole job is to say what happened,
 	including after the referenced record is gone -- a ticket deleted
 	later (test cleanup, a genuine retention policy) must not make this
@@ -198,4 +202,4 @@ def _write_log(event_key, reference_doctype, reference_name, channel, recipient,
 # on import (rather than plain `import channels`) purely so this
 # module-level name can't be confused with notify()'s own `channels`
 # parameter -- the import's only job is its side effect.
-from authcor.notifications import channels as _channels  # noqa: E402,F401
+from authcor.notifications import channels as _channels

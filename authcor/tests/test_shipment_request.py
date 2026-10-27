@@ -410,12 +410,16 @@ class TestShipmentRequestIsolation(IntegrationTestCase):
 
 	def test_client_sees_own_customer_shipment_via_list(self):
 		frappe.set_user(self.client_a.name)
-		names = {row.name for row in frappe.get_list("AC Shipment Request", fields=["name"], limit_page_length=0)}
+		names = {
+			row.name for row in frappe.get_list("AC Shipment Request", fields=["name"], limit_page_length=0)
+		}
 		self.assertIn(self.shipment_a.name, names)
 
 	def test_client_does_not_see_other_customer_shipment_via_list(self):
 		frappe.set_user(self.client_a.name)
-		names = {row.name for row in frappe.get_list("AC Shipment Request", fields=["name"], limit_page_length=0)}
+		names = {
+			row.name for row in frappe.get_list("AC Shipment Request", fields=["name"], limit_page_length=0)
+		}
 		self.assertNotIn(self.shipment_b.name, names)
 
 	def test_client_has_direct_read_on_own_customer_shipment(self):

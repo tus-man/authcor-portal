@@ -231,7 +231,13 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 
 		cls.addClassCleanup(
 			_cleanup_fixtures,
-			[cls.engineer_a.name, cls.engineer_b.name, cls.admin_user.name, cls.ops_l1_user.name, cls.portal_user.name],
+			[
+				cls.engineer_a.name,
+				cls.engineer_b.name,
+				cls.admin_user.name,
+				cls.ops_l1_user.name,
+				cls.portal_user.name,
+			],
 			[cls.customer.name],
 			cls.dc.name,
 			cls.city.name,
@@ -590,8 +596,7 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 
 		frappe.set_user(self.portal_user.name)
 		visible = {
-			row.name
-			for row in frappe.get_list("AC Expense Claim", fields=["name"], limit_page_length=0)
+			row.name for row in frappe.get_list("AC Expense Claim", fields=["name"], limit_page_length=0)
 		}
 		self.assertIn(submitted.name, visible)
 		self.assertNotIn(draft.name, visible)
@@ -714,6 +719,7 @@ class TestTimeExpenseCapture(IntegrationTestCase):
 		reloaded = self._reload(ticket.name)
 		self.assertEqual(reloaded.status, "Closed")
 		self.assertEqual(reloaded.completed_on, completed_on)
+
 
 class TestTimeEntryVisibility(IntegrationTestCase):
 	"""CHANGE-SET-POST-DEMO.md section 8/10.7: an engineer sees their own

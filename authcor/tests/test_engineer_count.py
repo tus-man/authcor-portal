@@ -289,9 +289,9 @@ class TestEngineerCountChange(IntegrationTestCase):
 		self._reload(ticket.name).db_set("status", "In Progress")
 
 		with self.assertRaises(frappe.ValidationError):
-			frappe.get_doc(
-				doctype="AC Engineer Count Request", ticket=ticket.name, requested_count=1
-			).insert(ignore_permissions=True)
+			frappe.get_doc(doctype="AC Engineer Count Request", ticket=ticket.name, requested_count=1).insert(
+				ignore_permissions=True
+			)
 
 	def test_second_pending_request_on_same_ticket_rejected(self):
 		ticket = self._new_ticket(engineers_required=3)
@@ -300,9 +300,9 @@ class TestEngineerCountChange(IntegrationTestCase):
 		)
 
 		with self.assertRaises(frappe.ValidationError):
-			frappe.get_doc(
-				doctype="AC Engineer Count Request", ticket=ticket.name, requested_count=2
-			).insert(ignore_permissions=True)
+			frappe.get_doc(doctype="AC Engineer Count Request", ticket=ticket.name, requested_count=2).insert(
+				ignore_permissions=True
+			)
 
 	# -- section 5: decisions ------------------------------------------------
 

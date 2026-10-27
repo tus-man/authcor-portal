@@ -3,7 +3,11 @@ from frappe import _
 from frappe.utils import add_to_date, getdate, now_datetime
 
 from authcor.notifications import notify
-from authcor.notifications.context import fin_expiring_context, shipment_overdue_context, unlogged_hours_context
+from authcor.notifications.context import (
+	fin_expiring_context,
+	shipment_overdue_context,
+	unlogged_hours_context,
+)
 from authcor.notifications.escalation import evaluate_escalation_rules
 from authcor.notifications.recipients import get_users_with_role
 
@@ -120,7 +124,7 @@ def send_fin_expiry_warnings():
 			event_key="fin_expiring",
 			reference_doctype="AC Engineer Profile",
 			reference_name=profile.name,
-			recipients=[profile.user] + ops_l1_users,
+			recipients=[profile.user, *ops_l1_users],
 			context=fin_expiring_context(full_name, profile.id_expiry),
 			subject=_("FIN expiring soon -- {0}").format(full_name),
 		)

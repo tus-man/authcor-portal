@@ -228,7 +228,9 @@ def parse_slot_grid(raw, required=False):
 		if slot_date in seen:
 			frappe.throw(_("{0} was offered twice.").format(_fmt_date(slot_date)))
 		seen.add(slot_date)
-		parsed.append({"slot_date": slot_date, **{band: 1 if cint(row.get(band)) else 0 for band in SLOT_BANDS}})
+		parsed.append(
+			{"slot_date": slot_date, **{band: 1 if cint(row.get(band)) else 0 for band in SLOT_BANDS}}
+		)
 
 	if not any(any(row[band] for band in SLOT_BANDS) for row in parsed):
 		frappe.throw(_("Tick at least one time band on at least one date."))
@@ -569,7 +571,9 @@ def _build_timeline(doc, confirmed_display):
 	if doc.confirmed_datetime:
 		timeline.append({"label": _("Visit confirmed"), "at": confirmed_display})
 	if doc.profile_released_on:
-		timeline.append({"label": _("Engineer details released"), "at": _fmt_datetime(doc.profile_released_on)})
+		timeline.append(
+			{"label": _("Engineer details released"), "at": _fmt_datetime(doc.profile_released_on)}
+		)
 	if doc.completed_on:
 		timeline.append({"label": _("Work completed"), "at": _fmt_datetime(doc.completed_on)})
 

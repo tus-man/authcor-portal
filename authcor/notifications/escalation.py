@@ -39,7 +39,9 @@ def _is_understaffed(ticket_name, engineers_required):
 	"""Section 5: "Unclaimed" means not fully staffed -- assigned count
 	against engineers_required, not against zero, so a ticket needing
 	three engineers with one claimed still counts as unmet."""
-	assigned = frappe.db.count("AC Ticket Engineer", {"parent": ticket_name, "parenttype": "AC Smart Hands Request"})
+	assigned = frappe.db.count(
+		"AC Ticket Engineer", {"parent": ticket_name, "parenttype": "AC Smart Hands Request"}
+	)
 	return assigned < engineers_required
 
 

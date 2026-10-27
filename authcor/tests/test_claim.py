@@ -443,7 +443,9 @@ class TestClaimRaceCondition(IntegrationTestCase):
 			user, _profile = _make_engineer(f"claim_race_eng_{i}@authcor.test")
 			cls.engineers.append(user)
 
-		cls.customer = _make_customer("Test Race Customer", authorised_engineers=[u.name for u in cls.engineers])
+		cls.customer = _make_customer(
+			"Test Race Customer", authorised_engineers=[u.name for u in cls.engineers]
+		)
 		frappe.db.commit()
 
 		cls.addClassCleanup(

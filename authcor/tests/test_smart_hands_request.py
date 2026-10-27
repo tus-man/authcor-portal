@@ -367,9 +367,7 @@ class TestDatetimeBoundaryNormalisation(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		cls.no_holidays_calendar = _make_holiday_calendar(
-			"Test Boundary No Holidays Calendar 2026", 2026, []
-		)
+		cls.no_holidays_calendar = _make_holiday_calendar("Test Boundary No Holidays Calendar 2026", 2026, [])
 		cls.city = _make_business_city(
 			"Test Boundary City",
 			"Singapore",
@@ -390,7 +388,9 @@ class TestDatetimeBoundaryNormalisation(IntegrationTestCase):
 		result = _compute_due_datetime(
 			"2026-06-15 02:00:00", 60, next_business_day=0, business_hours_only=1, city=self.city.name
 		)
-		self.assertEqual(result, add_business_minutes(get_datetime("2026-06-15 02:00:00"), 60, self.city.name))
+		self.assertEqual(
+			result, add_business_minutes(get_datetime("2026-06-15 02:00:00"), 60, self.city.name)
+		)
 
 	def test_next_business_day_branch_accepts_iso_string(self):
 		result = _compute_due_datetime(
@@ -439,7 +439,9 @@ class TestSmartHandsRequestController(IntegrationTestCase):
 		cls.data_center = _make_data_center("Test SHR DC", cls.city.name)
 		cls.customer = _make_customer(
 			"Test SHR Customer",
-			service_areas=[{"country": "Singapore", "city": cls.city.name, "data_center": cls.data_center.name}],
+			service_areas=[
+				{"country": "Singapore", "city": cls.city.name, "data_center": cls.data_center.name}
+			],
 		)
 		cls.engineer_user = _make_plain_user("shr_engineer@authcor.test")
 		cls.engineer_profile = _get_or_create(
@@ -1064,8 +1066,12 @@ class TestSlaBreachDetection(IntegrationTestCase):
 		# then a final commit to persist all three deletes.
 		cls.addClassCleanup(frappe.db.commit)
 		cls.addClassCleanup(frappe.delete_doc, "AC City", cls.city.name, force=True, ignore_permissions=True)
-		cls.addClassCleanup(frappe.delete_doc, "AC Data Center", cls.dc.name, force=True, ignore_permissions=True)
-		cls.addClassCleanup(frappe.delete_doc, "AC Customer", cls.customer.name, force=True, ignore_permissions=True)
+		cls.addClassCleanup(
+			frappe.delete_doc, "AC Data Center", cls.dc.name, force=True, ignore_permissions=True
+		)
+		cls.addClassCleanup(
+			frappe.delete_doc, "AC Customer", cls.customer.name, force=True, ignore_permissions=True
+		)
 
 	def _make_ticket(self, **overrides):
 		values = {
@@ -1084,7 +1090,9 @@ class TestSlaBreachDetection(IntegrationTestCase):
 		frappe.db.commit()
 		# LIFO again: commit registered first so it executes after the delete.
 		self.addCleanup(frappe.db.commit)
-		self.addCleanup(frappe.delete_doc, "AC Smart Hands Request", ticket.name, force=True, ignore_permissions=True)
+		self.addCleanup(
+			frappe.delete_doc, "AC Smart Hands Request", ticket.name, force=True, ignore_permissions=True
+		)
 		return ticket
 
 	def test_overdue_pending_response_is_marked_missed(self):
@@ -1094,7 +1102,9 @@ class TestSlaBreachDetection(IntegrationTestCase):
 
 		check_sla_breaches()
 
-		self.assertEqual(frappe.db.get_value("AC Smart Hands Request", ticket.name, "has_met_response_sla"), "No")
+		self.assertEqual(
+			frappe.db.get_value("AC Smart Hands Request", ticket.name, "has_met_response_sla"), "No"
+		)
 
 	def test_overdue_pending_onsite_is_marked_missed(self):
 		ticket = self._make_ticket()
@@ -1103,7 +1113,9 @@ class TestSlaBreachDetection(IntegrationTestCase):
 
 		check_sla_breaches()
 
-		self.assertEqual(frappe.db.get_value("AC Smart Hands Request", ticket.name, "has_met_onsite_sla"), "No")
+		self.assertEqual(
+			frappe.db.get_value("AC Smart Hands Request", ticket.name, "has_met_onsite_sla"), "No"
+		)
 
 	def test_not_yet_due_is_left_pending(self):
 		ticket = self._make_ticket()
@@ -1111,7 +1123,9 @@ class TestSlaBreachDetection(IntegrationTestCase):
 
 		check_sla_breaches()
 
-		self.assertEqual(frappe.db.get_value("AC Smart Hands Request", ticket.name, "has_met_response_sla"), "Pending")
+		self.assertEqual(
+			frappe.db.get_value("AC Smart Hands Request", ticket.name, "has_met_response_sla"), "Pending"
+		)
 
 	def test_already_resolved_verdict_is_left_alone(self):
 		ticket = self._make_ticket()
@@ -1121,4 +1135,6 @@ class TestSlaBreachDetection(IntegrationTestCase):
 
 		check_sla_breaches()
 
-		self.assertEqual(frappe.db.get_value("AC Smart Hands Request", ticket.name, "has_met_response_sla"), "Yes")
+		self.assertEqual(
+			frappe.db.get_value("AC Smart Hands Request", ticket.name, "has_met_response_sla"), "Yes"
+		)

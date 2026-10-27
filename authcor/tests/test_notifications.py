@@ -98,7 +98,13 @@ def _make_engineer(email):
 	profile = _get_or_create(
 		"AC Engineer Profile",
 		user.name,
-		{"user": user.name, "phone": "+65 8000 0000", "id_type": "NRIC", "id_number": "S1234567A", "is_active": 1},
+		{
+			"user": user.name,
+			"phone": "+65 8000 0000",
+			"id_type": "NRIC",
+			"id_number": "S1234567A",
+			"is_active": 1,
+		},
 	)
 	return user, profile
 
@@ -217,7 +223,9 @@ class TestNotifyDispatch(IntegrationTestCase):
 		for ticket_name in frappe.get_all(
 			"AC Smart Hands Request", filters={"customer": self.customer.name}, pluck="name"
 		):
-			for log_name in frappe.get_all("AC Notification Log", filters={"reference_name": ticket_name}, pluck="name"):
+			for log_name in frappe.get_all(
+				"AC Notification Log", filters={"reference_name": ticket_name}, pluck="name"
+			):
 				frappe.delete_doc("AC Notification Log", log_name, force=True, ignore_permissions=True)
 			frappe.delete_doc("AC Smart Hands Request", ticket_name, force=True, ignore_permissions=True)
 		frappe.db.commit()
@@ -227,13 +235,20 @@ class TestNotifyDispatch(IntegrationTestCase):
 		return _make_ticket(self.customer.name, self.city.name, self.dc.name)
 
 	def _context(self, ticket):
-		return {"ticket_name": ticket.name, "subject": ticket.subject, "severity": ticket.severity, "city": ticket.city}
+		return {
+			"ticket_name": ticket.name,
+			"subject": ticket.subject,
+			"severity": ticket.severity,
+			"city": ticket.city,
+		}
 
 	def _logs(self, event_key, reference_name, recipient=None):
 		filters = {"event_key": event_key, "reference_name": reference_name}
 		if recipient:
 			filters["recipient"] = recipient
-		return frappe.get_all("AC Notification Log", filters=filters, fields=["recipient", "channel", "status"])
+		return frappe.get_all(
+			"AC Notification Log", filters=filters, fields=["recipient", "channel", "status"]
+		)
 
 	def test_actor_is_excluded_from_recipients(self):
 		ticket = self._new_ticket()
@@ -361,7 +376,9 @@ class TestClientRoleSlaExclusion(IntegrationTestCase):
 		for ticket_name in frappe.get_all(
 			"AC Smart Hands Request", filters={"customer": self.customer.name}, pluck="name"
 		):
-			for log_name in frappe.get_all("AC Notification Log", filters={"reference_name": ticket_name}, pluck="name"):
+			for log_name in frappe.get_all(
+				"AC Notification Log", filters={"reference_name": ticket_name}, pluck="name"
+			):
 				frappe.delete_doc("AC Notification Log", log_name, force=True, ignore_permissions=True)
 			frappe.delete_doc("AC Smart Hands Request", ticket_name, force=True, ignore_permissions=True)
 		frappe.db.commit()
@@ -482,12 +499,15 @@ class TestRecipientResolvers(IntegrationTestCase):
 	def test_resolve_shipment_created(self):
 		shipment = frappe._dict(customer=self.customer.name)
 		self.assertCountEqual(
-			resolve_shipment_created(shipment), [self.engineer_a.name, self.engineer_b.name, self.lead_user.name]
+			resolve_shipment_created(shipment),
+			[self.engineer_a.name, self.engineer_b.name, self.lead_user.name],
 		)
 
 	def test_resolve_shipment_received(self):
 		shipment = frappe._dict(customer=self.customer.name)
-		self.assertCountEqual(resolve_shipment_received(shipment), [self.portal_user.name, self.lead_user.name])
+		self.assertCountEqual(
+			resolve_shipment_received(shipment), [self.portal_user.name, self.lead_user.name]
+		)
 
 	def test_resolve_shipment_closed(self):
 		shipment = frappe._dict(customer=self.customer.name)
@@ -625,12 +645,16 @@ class TestEscalationRuleMatching(IntegrationTestCase):
 		collision risk either way) but are cleaned up here too, along with
 		their notification logs, for the same tidiness reasons."""
 		frappe.set_user("Administrator")
-		for name in frappe.get_all("AC Escalation Rule", filters={"rule_name": ["like", "Test Notif Rule %"]}, pluck="name"):
+		for name in frappe.get_all(
+			"AC Escalation Rule", filters={"rule_name": ["like", "Test Notif Rule %"]}, pluck="name"
+		):
 			frappe.delete_doc("AC Escalation Rule", name, force=True, ignore_permissions=True)
 		for ticket_name in frappe.get_all(
 			"AC Smart Hands Request", filters={"customer": self.customer.name}, pluck="name"
 		):
-			for log_name in frappe.get_all("AC Notification Log", filters={"reference_name": ticket_name}, pluck="name"):
+			for log_name in frappe.get_all(
+				"AC Notification Log", filters={"reference_name": ticket_name}, pluck="name"
+			):
 				frappe.delete_doc("AC Notification Log", log_name, force=True, ignore_permissions=True)
 			frappe.delete_doc("AC Smart Hands Request", ticket_name, force=True, ignore_permissions=True)
 		frappe.db.commit()
@@ -638,12 +662,18 @@ class TestEscalationRuleMatching(IntegrationTestCase):
 
 	def _make_old_ticket(self, severity="P1", minutes_old=30, engineers_required=2):
 		ticket = _make_ticket(
-			self.customer.name, self.city.name, self.dc.name, severity=severity, engineers_required=engineers_required
+			self.customer.name,
+			self.city.name,
+			self.dc.name,
+			severity=severity,
+			engineers_required=engineers_required,
 		)
 		ticket.db_set("creation", add_to_date(now_datetime(), minutes=-minutes_old))
 		return ticket
 
-	def _make_rule(self, name, trigger="Unclaimed", severity="P1", service_level="Any", threshold=15, roles=None):
+	def _make_rule(
+		self, name, trigger="Unclaimed", severity="P1", service_level="Any", threshold=15, roles=None
+	):
 		rule_name = f"Test Notif Rule {name}"
 		return _get_or_create(
 			"AC Escalation Rule",
@@ -674,7 +704,8 @@ class TestEscalationRuleMatching(IntegrationTestCase):
 			evaluate_escalation_rules()
 
 		logs = frappe.get_all(
-			"AC Notification Log", filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name}
+			"AC Notification Log",
+			filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name},
 		)
 		self.assertTrue(logs)
 
@@ -686,7 +717,8 @@ class TestEscalationRuleMatching(IntegrationTestCase):
 			evaluate_escalation_rules()
 
 		logs = frappe.get_all(
-			"AC Notification Log", filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name}
+			"AC Notification Log",
+			filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name},
 		)
 		self.assertFalse(logs)
 
@@ -698,7 +730,8 @@ class TestEscalationRuleMatching(IntegrationTestCase):
 			evaluate_escalation_rules()
 
 		logs = frappe.get_all(
-			"AC Notification Log", filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name}
+			"AC Notification Log",
+			filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name},
 		)
 		self.assertTrue(logs)
 
@@ -710,7 +743,8 @@ class TestEscalationRuleMatching(IntegrationTestCase):
 			evaluate_escalation_rules()
 
 		logs = frappe.get_all(
-			"AC Notification Log", filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name}
+			"AC Notification Log",
+			filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name},
 		)
 		self.assertFalse(logs)
 
@@ -735,7 +769,11 @@ class TestEscalationRuleMatching(IntegrationTestCase):
 
 		sent_logs = frappe.get_all(
 			"AC Notification Log",
-			filters={"event_key": f"sla_breached:{rule.name}", "reference_name": ticket.name, "status": "Sent"},
+			filters={
+				"event_key": f"sla_breached:{rule.name}",
+				"reference_name": ticket.name,
+				"status": "Sent",
+			},
 			pluck="recipient",
 		)
 		self.assertTrue(sent_logs, "expected at least one Sent notification")
@@ -786,7 +824,9 @@ class TestUnloggedHoursNudge(IntegrationTestCase):
 		for ticket_name in frappe.get_all(
 			"AC Smart Hands Request", filters={"customer": self.customer.name}, pluck="name"
 		):
-			for log_name in frappe.get_all("AC Notification Log", filters={"reference_name": ticket_name}, pluck="name"):
+			for log_name in frappe.get_all(
+				"AC Notification Log", filters={"reference_name": ticket_name}, pluck="name"
+			):
 				frappe.delete_doc("AC Notification Log", log_name, force=True, ignore_permissions=True)
 			for entry_name in frappe.get_all("AC Time Entry", filters={"ticket": ticket_name}, pluck="name"):
 				entry = frappe.get_doc("AC Time Entry", entry_name)
@@ -827,11 +867,19 @@ class TestUnloggedHoursNudge(IntegrationTestCase):
 
 		logs_a = frappe.get_all(
 			"AC Notification Log",
-			filters={"event_key": "unlogged_hours", "reference_name": ticket.name, "recipient": self.engineer_a.name},
+			filters={
+				"event_key": "unlogged_hours",
+				"reference_name": ticket.name,
+				"recipient": self.engineer_a.name,
+			},
 		)
 		logs_b = frappe.get_all(
 			"AC Notification Log",
-			filters={"event_key": "unlogged_hours", "reference_name": ticket.name, "recipient": self.engineer_b.name},
+			filters={
+				"event_key": "unlogged_hours",
+				"reference_name": ticket.name,
+				"recipient": self.engineer_b.name,
+			},
 		)
 		self.assertTrue(logs_a)
 		self.assertFalse(logs_b)

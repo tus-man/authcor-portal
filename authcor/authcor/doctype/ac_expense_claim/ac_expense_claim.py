@@ -18,9 +18,7 @@ CLIENT_VISIBLE_STATUSES = ("Submitted", "Reimbursed")
 
 def _ensure_can_mark_reimbursed():
 	if not set(frappe.get_roles()) & APPROVAL_ROLES:
-		frappe.throw(
-			_("You are not permitted to mark expense claims as reimbursed."), frappe.PermissionError
-		)
+		frappe.throw(_("You are not permitted to mark expense claims as reimbursed."), frappe.PermissionError)
 
 
 def _ensure_can_submit_claim(doc):

@@ -54,9 +54,7 @@ def ensure_portal_membership(user, customer):
 		doc.append("portal_users", {"user": user, "authorizer_level": "L1 Authorizer", "is_active": 1})
 		doc.save(ignore_permissions=True)
 
-	if not frappe.db.exists(
-		"User Permission", {"user": user, "allow": "AC Customer", "for_value": customer}
-	):
+	if not frappe.db.exists("User Permission", {"user": user, "allow": "AC Customer", "for_value": customer}):
 		frappe.get_doc(
 			doctype="User Permission",
 			user=user,

@@ -91,9 +91,7 @@ def _get_holiday_dates(city_doc, year, holiday_cache):
 		return holiday_cache[year]
 
 	if not city_doc.holiday_calendar:
-		frappe.throw(
-			_("AC City {0} has no holiday_calendar configured for {1}.").format(city_doc.name, year)
-		)
+		frappe.throw(_("AC City {0} has no holiday_calendar configured for {1}.").format(city_doc.name, year))
 
 	calendar = frappe.get_cached_doc("AC Holiday Calendar", city_doc.holiday_calendar)
 	if calendar.year != year:
@@ -144,7 +142,9 @@ def _advance_to_working_instant(local_dt, business_hours, city_doc, tz, holiday_
 			return datetime.datetime.combine(d, start_time, tzinfo=tz)
 		if local_dt.time() < end_time:
 			return local_dt
-	return _next_working_period_start(d + datetime.timedelta(days=1), business_hours, city_doc, tz, holiday_cache)
+	return _next_working_period_start(
+		d + datetime.timedelta(days=1), business_hours, city_doc, tz, holiday_cache
+	)
 
 
 def _get_business_hours_or_throw(city_doc):
@@ -280,7 +280,11 @@ def _apply_sla_policy(doc, policy, start_utc):
 	has_onsite_target = bool(policy.onsite_minutes) or bool(policy.onsite_next_business_day)
 	doc.onsite_due = (
 		_compute_due_datetime(
-			start_utc, policy.onsite_minutes, policy.onsite_next_business_day, policy.business_hours_only, doc.city
+			start_utc,
+			policy.onsite_minutes,
+			policy.onsite_next_business_day,
+			policy.business_hours_only,
+			doc.city,
 		)
 		if has_onsite_target
 		else None
@@ -829,7 +833,11 @@ class ACSmartHandsRequest(Document):
 				subject=_("[{0}] Engineer assigned -- {1}").format(self.name, self.subject),
 			)
 
-		if self.has_value_changed("confirmed_datetime") and self.confirmed_datetime and not previous.confirmed_datetime:
+		if (
+			self.has_value_changed("confirmed_datetime")
+			and self.confirmed_datetime
+			and not previous.confirmed_datetime
+		):
 			notify(
 				event_key="slot_confirmed",
 				reference_doctype="AC Smart Hands Request",
@@ -879,7 +887,9 @@ class ACSmartHandsRequest(Document):
 				reference_name=self.name,
 				recipients=resolve_severity_escalated(self),
 				context=severity_escalated_context(self),
-				subject=_("[{0}] Severity escalated to {1} -- {2}").format(self.name, self.severity, self.subject),
+				subject=_("[{0}] Severity escalated to {1} -- {2}").format(
+					self.name, self.severity, self.subject
+				),
 			)
 
 	def validate(self):
@@ -948,9 +958,9 @@ class ACSmartHandsRequest(Document):
 		)
 		if not slot_row or not slot_row.get(band_fieldname):
 			frappe.throw(
-				_("The confirmed time {0} on {1} does not fall inside a time band the customer offered.").format(
-					self.confirmed_time, self.confirmed_date
-				)
+				_(
+					"The confirmed time {0} on {1} does not fall inside a time band the customer offered."
+				).format(self.confirmed_time, self.confirmed_date)
 			)
 
 		timezone_name = frappe.db.get_value("AC City", self.city, "timezone")
@@ -982,7 +992,9 @@ class ACSmartHandsRequest(Document):
 		if self.status != "Completed":
 			return
 		if not self.proof_of_work:
-			frappe.throw(_("At least one proof-of-work image is required before this ticket can be Completed."))
+			frappe.throw(
+				_("At least one proof-of-work image is required before this ticket can be Completed.")
+			)
 
 	def _has_submitted_time_entry(self):
 		return bool(frappe.db.exists("AC Time Entry", {"ticket": self.name, "docstatus": 1}))

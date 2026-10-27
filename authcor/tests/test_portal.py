@@ -543,9 +543,7 @@ class TestPortalTicketDetail(PortalPageMixin, IntegrationTestCase):
 		ticket.db_set("external_reference", '" onmouseover="alert(3)', update_modified=False)
 		# description is the one value rendered as HTML; build_portal_ticket_
 		# view runs it through sanitize_html, which has to remove this.
-		ticket.db_set(
-			"description", '<p>ok</p><script>alert(4)</script>', update_modified=False
-		)
+		ticket.db_set("description", "<p>ok</p><script>alert(4)</script>", update_modified=False)
 
 		frappe.set_user(self.user_a.name)
 		html = self.render(f"/portal/tickets/{ticket.name}")
@@ -717,9 +715,7 @@ def _cleanup_portal_action_fixtures(user_emails, customer_names, dc_name, city_n
 	for ticket in frappe.get_all(
 		"AC Smart Hands Request", filters={"customer": ["in", customer_names]}, pluck="name"
 	):
-		for request in frappe.get_all(
-			"AC Engineer Count Request", filters={"ticket": ticket}, pluck="name"
-		):
+		for request in frappe.get_all("AC Engineer Count Request", filters={"ticket": ticket}, pluck="name"):
 			frappe.delete_doc("AC Engineer Count Request", request, force=True, ignore_permissions=True)
 		frappe.delete_doc("AC Smart Hands Request", ticket, force=True, ignore_permissions=True)
 	for name in customer_names:
@@ -886,9 +882,7 @@ class TestPortalTicketActions(IntegrationTestCase):
 		ticket = self._new_ticket(engineers_required=1)
 		frappe.set_user(self.user.name)
 		increase_engineer_count(ticket.name, 3)
-		self.assertEqual(
-			frappe.db.get_value("AC Smart Hands Request", ticket.name, "engineers_required"), 3
-		)
+		self.assertEqual(frappe.db.get_value("AC Smart Hands Request", ticket.name, "engineers_required"), 3)
 
 	def test_count_decrease_raises_a_request_through_the_existing_method(self):
 		ticket = self._new_ticket(engineers_required=3)

@@ -1,12 +1,11 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from werkzeug.test import EnvironBuilder
-from werkzeug.wrappers import Request
-
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils.password import update_password
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
 
 
 def _add_user(email, password, roles=None, username=None):

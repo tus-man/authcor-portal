@@ -19,7 +19,12 @@ import frappe
 
 
 def ticket_created_context(ticket):
-	return {"ticket_name": ticket.name, "subject": ticket.subject, "severity": ticket.severity, "city": ticket.city}
+	return {
+		"ticket_name": ticket.name,
+		"subject": ticket.subject,
+		"severity": ticket.severity,
+		"city": ticket.city,
+	}
 
 
 def ticket_claimed_context(ticket):

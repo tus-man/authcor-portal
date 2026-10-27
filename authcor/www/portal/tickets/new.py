@@ -49,9 +49,7 @@ def get_context(context):
 	context.severity_options = severity_options()
 	context.action_options = action_options()
 	context.slot_band_labels = SLOT_BAND_LABELS
-	context.slots = [
-		{**row, "slot_label": format_date(row["slot_date"])} for row in default_slot_grid()
-	]
+	context.slots = [{**row, "slot_label": format_date(row["slot_date"])} for row in default_slot_grid()]
 
 	# Prefilled country and city, per PLAN.md section 8's Phase 7 note --
 	# but only when they are actually inside this customer's service tree,
@@ -61,9 +59,7 @@ def get_context(context):
 	cities = {city["name"] for entry in tree for city in entry["cities"]}
 	context.default_country = customer.default_country if customer.default_country in countries else None
 	context.default_city = (
-		customer.default_city
-		if context.default_country and customer.default_city in cities
-		else None
+		customer.default_city if context.default_country and customer.default_city in cities else None
 	)
 
 	context.create_method = method_path(create_portal_ticket)
