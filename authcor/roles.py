@@ -32,12 +32,23 @@ Two things in here are not obvious from the table itself:
   Smart Hands Request: engineers are meant to see SLA timers. Client roles
   hold no permlevel 1 grant anywhere, which is the line that matters.
 
-Doctypes absent from the table keep their standard perms -- System Manager
-only. That is deliberate for the five configuration doctypes (AC SLA
-Policy, AC Holiday Calendar, AC Escalation Rule, AC Notification Settings,
-AC Auth Settings): the controllers read them server-side with get_doc /
-get_cached_doc, which does not consult permissions, so no role needs a
-grant to make the app work. Child tables inherit their parent's.
+The five configuration doctypes are in the table for the humans, not for
+the app. Controllers read them server-side with get_doc / get_cached_doc,
+which does not consult permissions at all, so the app would run with no
+grant on any of them -- these rows exist so that an Authcor admin can
+manage the configuration in Desk instead of needing a System Manager.
+
+Two tiers there, deliberately. AC SLA Policy, AC Holiday Calendar and AC
+Escalation Rule are ordinary records an admin maintains, so Admin L1 and L2
+get read, write and create. AC Auth Settings and AC Notification Settings
+are Singles holding switches that reach past their own doctype -- password
+login per role, and the notification kill switch that silences every event
+in the app -- so only Admin L1 gets them, and only read and write; there is
+nothing to create on a Single anyway. `delete` stays with System Manager
+throughout: removing an SLA policy or a holiday calendar that tickets
+already reference is a different kind of act from editing one.
+
+Child tables are absent because they inherit their parent's permissions.
 """
 
 import frappe
@@ -79,6 +90,12 @@ GRANTS = (
 )
 
 PERMISSIONS = {
+	"AC Auth Settings": {
+		0: {
+			"Admin L1": "read write",
+			"System Manager": "read write create delete print email share",
+		},
+	},
 	"AC City": {
 		0: {
 			"Admin L1": "read write create delete",
@@ -146,6 +163,13 @@ PERMISSIONS = {
 			"Operations L1 Authorizer": "read export",
 		},
 	},
+	"AC Escalation Rule": {
+		0: {
+			"Admin L1": "read write create",
+			"Admin L2": "read write create",
+			"System Manager": "read write create delete report export print email share",
+		},
+	},
 	"AC Expense Claim": {
 		0: {
 			"Admin L1": "read write create delete",
@@ -156,6 +180,13 @@ PERMISSIONS = {
 			"Operations L1 Authorizer": "read write create",
 			"Operations L2 Authorizer": "read write create if_owner",
 			"Operations L3 Authorizer": "read write create if_owner",
+			"System Manager": "read write create delete report export print email share",
+		},
+	},
+	"AC Holiday Calendar": {
+		0: {
+			"Admin L1": "read write create",
+			"Admin L2": "read write create",
 			"System Manager": "read write create delete report export print email share",
 		},
 	},
@@ -173,6 +204,12 @@ PERMISSIONS = {
 			"System Manager": "read write create delete report export print email share",
 		},
 	},
+	"AC Notification Settings": {
+		0: {
+			"Admin L1": "read write",
+			"System Manager": "read write create delete print email share",
+		},
+	},
 	"AC Shipment Request": {
 		0: {
 			"Admin L1": "read write create delete",
@@ -183,6 +220,13 @@ PERMISSIONS = {
 			"Operations L1 Authorizer": "read write create",
 			"Operations L2 Authorizer": "read write create",
 			"Operations L3 Authorizer": "read write create",
+			"System Manager": "read write create delete report export print email share",
+		},
+	},
+	"AC SLA Policy": {
+		0: {
+			"Admin L1": "read write create",
+			"Admin L2": "read write create",
 			"System Manager": "read write create delete report export print email share",
 		},
 	},
@@ -281,6 +325,26 @@ def sync_role_permissions(overwrite=True):
 	# Permissions are cached per doctype, and a freshly written row is
 	# invisible to frappe.has_permission until the cache is dropped.
 	frappe.clear_cache()
+	return written
+
+
+def sync_and_report():
+	"""sync_role_permissions(), plus a line on stdout saying what it did.
+
+	What the patches call. print, not frappe.logger(): a logger from
+	frappe.logger() runs at WARNING on a dev server and ERROR otherwise
+	(frappe/utils/logger.py: default_log_level), so an .info() call is
+	discarded before it reaches a file -- and even when it is not, it lands
+	in logs/frappe.log rather than in the terminal running the migrate.
+	bench migrate shows a patch's stdout, and "did this change anything" is
+	exactly what someone running it wants to see.
+	"""
+	written = sync_role_permissions()
+	print(
+		f"authcor: {written} role permission row(s) written"
+		if written
+		else "authcor: role permissions already match authcor/roles.py"
+	)
 	return written
 
 
