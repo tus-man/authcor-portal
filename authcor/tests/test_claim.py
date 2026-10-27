@@ -433,6 +433,22 @@ class TestClaimRaceCondition(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		# Committed here, in setUpClass, for the same reason the rest of
+		# this class's fixtures are: each worker thread opens its own
+		# connection and cannot see an uncommitted row, so a policy created
+		# inside this test's transaction would leave every thread throwing
+		# "No active AC SLA Policy" instead of racing for the lock.
+		ensure_sla_policy_committed(
+			cls.addClassCleanup,
+			"Standard",
+			"P4",
+			response_minutes=480,
+			onsite_minutes=0,
+			onsite_next_business_day=0,
+			business_hours_only=0,
+			response_next_business_day=0,
+		)
+
 		cls.city = _make_city("Test Race City")
 		cls.dc = _make_data_center("Test Race DC", cls.city.name)
 		cls.num_engineers = 6

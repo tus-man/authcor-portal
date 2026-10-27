@@ -625,6 +625,19 @@ class TestEscalationRuleMatching(IntegrationTestCase):
 			business_hours_only=0,
 			response_next_business_day=0,
 		)
+		# P4 as well: test_severity_mismatch_does_not_fire and
+		# test_any_severity_wildcard_matches both raise a P4 ticket against
+		# this Standard customer, and the pair needs its own policy.
+		ensure_sla_policy_committed(
+			cls.addClassCleanup,
+			"Standard",
+			"P4",
+			response_minutes=480,
+			onsite_minutes=0,
+			onsite_next_business_day=0,
+			business_hours_only=0,
+			response_next_business_day=0,
+		)
 		cls.city = _make_city("Test Notif Escalation City")
 		cls.dc = _make_data_center("Test Notif Escalation DC", cls.city.name)
 		cls.customer = _make_customer("Test Notif Escalation Customer")

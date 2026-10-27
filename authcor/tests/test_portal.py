@@ -576,16 +576,24 @@ class TestCreatePortalTicket(IntegrationTestCase):
 		# after_install (authcor/sla_policies.py) and editable in Desk by
 		# an Authcor admin, so a test that leaned on them would go red the
 		# day someone revised a response target.
-		for severity in ("P3", "P4"):
-			ensure_sla_policy(
-				"Standard",
-				severity,
-				response_minutes=480,
-				onsite_minutes=0,
-				onsite_next_business_day=0,
-				business_hours_only=0,
-				response_next_business_day=0,
-			)
+		ensure_sla_policy(
+			"Standard",
+			"P3",
+			response_minutes=480,
+			onsite_minutes=0,
+			onsite_next_business_day=0,
+			business_hours_only=0,
+			response_next_business_day=0,
+		)
+		ensure_sla_policy(
+			"Standard",
+			"P4",
+			response_minutes=480,
+			onsite_minutes=0,
+			onsite_next_business_day=0,
+			business_hours_only=0,
+			response_next_business_day=0,
+		)
 		cls.city = _make_city("Test Portal Create City")
 		cls.other_city = _make_city("Test Portal Create Other City")
 		cls.dc = _make_data_center("Test Portal Create DC", cls.city.name)
