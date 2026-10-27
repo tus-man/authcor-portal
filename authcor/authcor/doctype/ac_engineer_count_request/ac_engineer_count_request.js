@@ -85,9 +85,12 @@ function approve_request(frm) {
 			fields: fields,
 			primary_action_label: __("Approve"),
 			primary_action: (values) => {
-				const selected = required_removals > 0 ? dialog.get_value("engineers_to_remove") || [] : [];
+				const selected =
+					required_removals > 0 ? dialog.get_value("engineers_to_remove") || [] : [];
 				if (selected.length !== required_removals) {
-					frappe.msgprint(__("Select exactly {0} engineer(s) to remove.", [required_removals]));
+					frappe.msgprint(
+						__("Select exactly {0} engineer(s) to remove.", [required_removals])
+					);
 					return;
 				}
 

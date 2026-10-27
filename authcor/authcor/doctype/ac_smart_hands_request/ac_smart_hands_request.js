@@ -183,7 +183,9 @@ function change_engineer_count(frm) {
 		],
 		(values) => {
 			if (values.new_count === frm.doc.engineers_required) {
-				frappe.msgprint(__("New count is the same as the current count -- nothing to change."));
+				frappe.msgprint(
+					__("New count is the same as the current count -- nothing to change.")
+				);
 				return;
 			}
 
@@ -207,7 +209,9 @@ function change_engineer_count(frm) {
 					freeze: true,
 					callback() {
 						frappe.show_alert({
-							message: __("Engineer count reduction request submitted for approval."),
+							message: __(
+								"Engineer count reduction request submitted for approval."
+							),
 							indicator: "green",
 						});
 						frm.reload_doc();

@@ -37,7 +37,7 @@
 				return (holder.textContent || "").trim();
 			}
 		}
-		return (payload.message && payload.message.toString && typeof payload.message === "string")
+		return payload.message && payload.message.toString && typeof payload.message === "string"
 			? payload.message
 			: "";
 	}
@@ -64,9 +64,9 @@
 			headers: {
 				"Content-Type": "application/json",
 				Accept: "application/json",
-				"X-Frappe-CSRF-Token": csrfToken()
+				"X-Frappe-CSRF-Token": csrfToken(),
 			},
-			body: JSON.stringify(args || {})
+			body: JSON.stringify(args || {}),
 		}).then(readResponse);
 	}
 
@@ -83,7 +83,7 @@
 			method: "POST",
 			credentials: "same-origin",
 			headers: { "X-Frappe-CSRF-Token": csrfToken() },
-			body: form
+			body: form,
 		}).then(readResponse);
 	}
 
@@ -123,6 +123,6 @@
 		upload: upload,
 		showError: showError,
 		clearError: clearError,
-		busy: busy
+		busy: busy,
 	};
 })();

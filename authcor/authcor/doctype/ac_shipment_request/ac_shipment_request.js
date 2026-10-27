@@ -68,10 +68,16 @@ function setup_status_buttons(frm) {
 
 	if (frm.doc.status === "Open") {
 		frm.add_custom_button(__("Mark Received"), () => call_status_action(frm, "mark_received"));
-		frm.add_custom_button(__("Cancel Shipment"), () => call_status_action(frm, "cancel_shipment"));
+		frm.add_custom_button(__("Cancel Shipment"), () =>
+			call_status_action(frm, "cancel_shipment")
+		);
 	} else if (frm.doc.status === "Received") {
-		frm.add_custom_button(__("Close Shipment"), () => call_status_action(frm, "close_shipment"));
-		frm.add_custom_button(__("Cancel Shipment"), () => call_status_action(frm, "cancel_shipment"));
+		frm.add_custom_button(__("Close Shipment"), () =>
+			call_status_action(frm, "close_shipment")
+		);
+		frm.add_custom_button(__("Cancel Shipment"), () =>
+			call_status_action(frm, "cancel_shipment")
+		);
 	}
 }
 
@@ -98,7 +104,9 @@ function setup_tracking_button(frm) {
 		args: { carrier: frm.doc.carrier, tracking_number: frm.doc.tracking_number },
 		callback(r) {
 			if (r.message) {
-				frm.add_custom_button(__("Track Shipment"), () => window.open(r.message, "_blank"));
+				frm.add_custom_button(__("Track Shipment"), () =>
+					window.open(r.message, "_blank")
+				);
 			}
 		},
 	});
