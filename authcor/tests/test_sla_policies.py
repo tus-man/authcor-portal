@@ -1,9 +1,18 @@
 """The seeded AC SLA Policy table (authcor/sla_policies.py).
 
-Nothing here asserts a particular response target: those are Authcor's
-commercial numbers and the admins may revise them in Desk. What is tested
-is the shape of the table and the one promise the seeding makes -- that it
-creates what is missing and never touches what is there.
+Three things: the shape of the table, the one promise the seeding makes
+(it creates what is missing and never touches what is there), and that the
+site's own rows still match the table.
+
+That last one is a backstop, not a style check. The fixtures in
+sla_fixtures.py have to mutate these shared rows to test specific targets,
+and a run killed outright leaves no cleanup running. That happened: a
+Standard-P1 mutation survived, every later run re-blessed it, and the
+wrong value reached sla_policies.py before Authcor's matrix was checked
+against it. A divergence here means either that, or an admin edit in Desk
+that SLA_POLICIES has not been told about -- in which case new sites are
+being seeded with different numbers from this one. Either way it is worth
+knowing, so the failure names the row and the bench command to fix it.
 
 Non-committing throughout, so IntegrationTestCase's rollback puts the
 site's real policies back at the end of the class.
@@ -100,3 +109,44 @@ class TestSyncSlaPolicies(IntegrationTestCase):
 		self.assertEqual(sync_sla_policies(), 0)
 
 		self.assertEqual(frappe.db.get_value("AC SLA Policy", name, "is_active"), 0)
+
+
+class TestSlaPolicyMatchesTheMatrix(IntegrationTestCase):
+	def test_every_policy_on_this_site_matches_the_shipped_table(self):
+		rows = {
+			(row.service_level, row.severity): row
+			for row in frappe.get_all(
+				"AC SLA Policy",
+				fields=["name", "service_level", "severity", "is_active", *POLICY_FIELDS],
+			)
+		}
+
+		problems = []
+		repairs = {}
+		for table_row in SLA_POLICIES:
+			pair = (table_row[0], table_row[1])
+			name = _name(*pair)
+			live = rows.get(pair)
+			if live is None:
+				problems.append(f"{name} is missing from this site")
+				continue
+			for fieldname, expected in policy_values(table_row).items():
+				if live.get(fieldname) != expected:
+					problems.append(f"{name}.{fieldname} is {live.get(fieldname)}, table says {expected}")
+					repairs.setdefault(name, {})[fieldname] = expected
+
+		if not problems:
+			return
+
+		commands = "\n".join(
+			f'  frappe.db.set_value("AC SLA Policy", "{name}", {values})' for name, values in repairs.items()
+		)
+		self.fail(
+			"This site's AC SLA Policy rows have drifted from authcor/sla_policies.py:\n  "
+			+ "\n  ".join(problems)
+			+ "\n\nIf the table is right, repair the site in bench console (which runs in an "
+			"uncommitted transaction, so the commit matters):\n"
+			+ commands
+			+ "\n  frappe.db.commit()\n\nIf the site is right, the table is what needs changing -- "
+			"and so does Authcor's matrix in docs/PHASE-3-SLA.md section 4."
+		)

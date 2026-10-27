@@ -22,24 +22,28 @@ ticket makes its own policy through `authcor/tests/sla_fixtures.py`, for
 the same reason -- an admin editing a response target must not be able to
 turn the suite red.
 
-The table below is laid out to be read against `docs/PHASE-3-SLA.md`
-section 4 line by line. Where it disagrees with that document, the values
-here are the ones from the dev site, and the differences are deliberate
-and listed:
+The table below is Authcor's own matrix, confirmed against it row by row,
+and it is the authority -- not any running site. The dev site had
+Standard-P1 at 15 minutes with no onsite target where the matrix says 60
+and 240; that was test fixture residue, not a decision (see
+`authcor/tests/sla_fixtures.py`), and the matrix value is what ships.
+
+Two differences from `docs/PHASE-3-SLA.md` section 4 remain, both
+deliberate:
 
 - **`response_next_business_day` does not exist in the doc at all.** The
   four P4-Scheduled rows carry it, and no onsite flag: for scheduled work
   the onsite obligation is the confirmed slot, and the response obligation
   is "the next working day", not a duration. The doc's NBD column for
   those rows refers to onsite.
-- **Standard-P1 is 15 minutes with no onsite target; the doc says 60 and
-  240.** Flagged, not resolved -- these are the live dev values and
-  nothing in the app or the tests depends on either reading. A 15-minute
-  response on Standard is also tighter than Premium's 60, which is why it
-  is worth a second look rather than a silent copy.
 - The doc still lists a `policy_name` Data field; the doctype has none,
   having moved to the `{service_level}-{severity}` autoname the same
   section suggests as the alternative.
+
+One target is an open question with Authcor rather than a difference --
+Basic-P3's "48 Hours (Business Days)" is built as 2880 business minutes,
+about five working days. Recorded in `docs/PHASE-3-SLA.md`, "Open with
+Authcor".
 """
 
 import frappe
@@ -64,7 +68,7 @@ SLA_POLICIES = (
 	("Premium", "P2", 120, 0, 360, 0, 0),
 	("Premium", "P3", 180, 0, 1440, 0, 0),
 	("Premium", "P4", 360, 0, 0, 0, 0),
-	("Standard", "P1", 15, 0, 0, 0, 0),
+	("Standard", "P1", 60, 0, 240, 0, 0),
 	("Standard", "P2", 120, 0, 0, 1, 0),
 	("Standard", "P3", 240, 0, 2160, 0, 0),
 	("Standard", "P4", 480, 0, 0, 0, 0),
