@@ -733,6 +733,24 @@ def _get_disclosure_recipients(customer):
 	return emails
 
 
+# Every value is escaped by hand. Frappe's Jinja environment has
+# autoescaping off (FrappeSandboxedEnvironment sets none), so a bare
+# {{ }} emits the field verbatim -- and engineer_name is a User full_name
+# and phone an AC Engineer Profile field, both set by the engineer, going
+# into mail the customer reads. Kept at module level so the escaping can
+# be tested by rendering it (authcor/tests/test_notifications.py) rather
+# than by reconstructing the whole disclosure path.
+ENGINEER_DISCLOSURE_TEMPLATE = """
+	<p>An engineer has been assigned to ticket <strong>{{ ticket_name | e }}</strong> ({{ subject | e }}).</p>
+	<table>
+		<tr><td>Name</td><td>{{ engineer_name | e }}</td></tr>
+		<tr><td>{{ id_label | e }}</td><td>{{ id_number | e }}</td></tr>
+		<tr><td>Phone</td><td>{{ phone | e }}</td></tr>
+	</table>
+	<p>Please use these details to file the data centre access request.</p>
+"""
+
+
 def disclose_engineer_profile(ticket, engineer_profile):
 	"""Section 3. The single place NRIC/FIN gets disclosed to a customer --
 	called from nowhere else. Reads the decrypted ID, builds the
@@ -751,15 +769,7 @@ def disclose_engineer_profile(ticket, engineer_profile):
 
 	subject = _("Engineer assigned to your ticket {0}").format(ticket.name)
 	message = frappe.render_template(
-		"""
-		<p>An engineer has been assigned to ticket <strong>{{ ticket_name }}</strong> ({{ subject }}).</p>
-		<table>
-			<tr><td>Name</td><td>{{ engineer_name }}</td></tr>
-			<tr><td>{{ id_label }}</td><td>{{ id_number }}</td></tr>
-			<tr><td>Phone</td><td>{{ phone }}</td></tr>
-		</table>
-		<p>Please use these details to file the data centre access request.</p>
-		""",
+		ENGINEER_DISCLOSURE_TEMPLATE,
 		{
 			"ticket_name": ticket.name,
 			"subject": ticket.subject,

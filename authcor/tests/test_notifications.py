@@ -1,9 +1,15 @@
+import ast
+import os
+import re
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, now_datetime
 
+from authcor.authcor.doctype.ac_smart_hands_request.ac_smart_hands_request import (
+	ENGINEER_DISCLOSURE_TEMPLATE,
+)
 from authcor.notifications import notify
 from authcor.notifications.context import build_ticket_closed_context
 from authcor.notifications.escalation import evaluate_escalation_rules
@@ -883,3 +889,128 @@ class TestUnloggedHoursNudge(IntegrationTestCase):
 		)
 		self.assertTrue(logs_a)
 		self.assertFalse(logs_b)
+
+
+# -- inline email templates ------------------------------------------------
+#
+# test_portal.py's hygiene check scans the files under www/ and templates/,
+# which is why it never saw the one template this app builds in Python.
+# These two tests close that gap from both ends: one renders it with markup
+# in the values an engineer controls, the other scans the app's Python for
+# any other template literal handed to render_template.
+
+PLACEHOLDER = re.compile(r"{{(.+?)}}")
+ESCAPED = re.compile(r"\|\s*(e|escape)\s*$")
+
+# Placeholders deliberately rendered without escaping, each with its
+# reason. Empty today, and an entry is a promise that something else makes
+# the value safe.
+RAW_PLACEHOLDERS: dict[str, str] = {}
+
+
+def _unescaped_placeholders(template):
+	"""The placeholder expressions in `template` that do not end in | e."""
+	return [
+		expression.strip()
+		for expression in PLACEHOLDER.findall(template)
+		if not ESCAPED.search(expression.strip()) and expression.strip() not in RAW_PLACEHOLDERS
+	]
+
+
+def _template_literals_passed_to_render_template(app_path):
+	"""[(path, lineno, template)] for every render_template() call in the
+	app whose template argument this can read -- a string literal, or a
+	module-level constant assigned one in the same file."""
+	found = []
+	for root, dirs, files in os.walk(app_path):
+		dirs[:] = [d for d in dirs if d not in {"__pycache__", "node_modules"}]
+		for filename in sorted(files):
+			if not filename.endswith(".py"):
+				continue
+			path = os.path.join(root, filename)
+			with open(path, encoding="utf-8") as f:
+				tree = ast.parse(f.read(), path)
+
+			constants = {
+				target.id: node.value.value
+				for node in tree.body
+				if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant)
+				for target in node.targets
+				if isinstance(target, ast.Name) and isinstance(node.value.value, str)
+			}
+
+			for node in ast.walk(tree):
+				if not isinstance(node, ast.Call) or not node.args:
+					continue
+				name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
+				if name not in {"render_template", "get_template"}:
+					continue
+				first = node.args[0]
+				if isinstance(first, ast.Constant) and isinstance(first.value, str):
+					found.append((path, node.lineno, first.value))
+				elif isinstance(first, ast.Name) and first.id in constants:
+					found.append((path, node.lineno, constants[first.id]))
+	return found
+
+
+class TestEngineerDisclosureEmail(IntegrationTestCase):
+	"""PDPA section of PLAN.md section 9: this mail carries a decrypted
+	NRIC/FIN to the customer. The values around it are the engineer's own
+	-- their User full_name and their profile phone -- and the customer
+	reads the result as HTML."""
+
+	MARKUP = '<img src=x onerror="alert(1)">'
+
+	def _render(self, **overrides):
+		context = {
+			"ticket_name": "TKT-0001",
+			"subject": "Rack audit",
+			"engineer_name": "Priya Nair",
+			"id_label": "FIN",
+			"id_number": "G1234567X",
+			"phone": "+6591234567",
+		}
+		context.update(overrides)
+		return frappe.render_template(ENGINEER_DISCLOSURE_TEMPLATE, context)
+
+	def test_markup_in_the_engineer_name_comes_out_escaped(self):
+		html = self._render(engineer_name=self.MARKUP)
+
+		self.assertNotIn("<img src=x", html)
+		self.assertNotIn('onerror="alert(1)"', html)
+		# Escaped, not dropped -- the customer still has to be able to read
+		# whatever the name really is.
+		self.assertIn("&lt;img src=x", html)
+
+	def test_markup_in_every_engineer_controlled_value_comes_out_escaped(self):
+		for field in ("engineer_name", "phone", "id_number", "subject"):
+			with self.subTest(field=field):
+				html = self._render(**{field: self.MARKUP})
+				self.assertNotIn("<img src=x", html)
+				self.assertIn("&lt;img src=x", html)
+
+	def test_the_template_itself_escapes_every_placeholder(self):
+		"""Renders prove the values that are tested; this covers the rest,
+		so a sixth placeholder added later cannot arrive unescaped."""
+		unescaped = _unescaped_placeholders(ENGINEER_DISCLOSURE_TEMPLATE)
+		self.assertFalse(unescaped, msg=f"placeholders rendered raw: {unescaped}")
+
+	def test_no_template_built_in_python_renders_a_value_raw(self):
+		app_path = frappe.get_app_path("authcor")
+		templates = _template_literals_passed_to_render_template(app_path)
+		self.assertTrue(templates, msg=f"no render_template() calls found under {app_path}")
+
+		offenders = [
+			f"{os.path.relpath(path, app_path)}:{lineno} renders {expression!r} raw"
+			for path, lineno, template in templates
+			for expression in _unescaped_placeholders(template)
+		]
+		self.assertFalse(
+			offenders,
+			msg=(
+				"Frappe's Jinja environment has autoescaping off, so a bare {{ }} emits "
+				"the value verbatim. Add | e, or -- if something else already makes it "
+				"safe -- add the placeholder to RAW_PLACEHOLDERS with the reason.\n  "
+				+ "\n  ".join(offenders)
+			),
+		)
